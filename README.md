@@ -38,7 +38,7 @@ AAC4U helps people who have difficulty with spoken language to communicate using
 
 ```bash
 # Clone the repository
-git clone https://github.com/djrogers/aac4u.git
+git clone https://github.com/djr812/aac4u.git
 cd aac4u
 
 # Build debug APK
