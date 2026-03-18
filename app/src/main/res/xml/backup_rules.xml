@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android auto-backup configuration.
+    Back up the database and custom images — these are critical for AAC users.
+    Do NOT back up cache or temporary files.
+-->
+<full-backup-content>
+    <include domain="database" path="aac4u.db" />
+    <include domain="file" path="custom/" />
+    <include domain="sharedpref" path="." />
+    <exclude domain="cache" path="." />
+    <exclude domain="file" path="symbols/arasaac_core/" />
+</full-backup-content>

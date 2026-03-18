@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- TTS requires no special permissions -->
+    <!-- Camera permission for future "photo to button" feature -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Declare that internet is NOT required (offline-first) -->
+    <uses-permission android:name="android.permission.INTERNET"
+        android:required="false" />
+
+    <!-- Accessibility features declaration -->
+    <uses-feature android:name="android.hardware.touchscreen"
+        android:required="false" />
+    <uses-feature android:name="android.hardware.camera"
+        android:required="false" />
+
+    <application
+        android:name=".AAC4UApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.AAC4U"
+        tools:targetApi="35">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="unspecified"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
+            android:windowSoftInputMode="adjustResize"
+            android:theme="@style/Theme.AAC4U">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Declare as accessibility app for Play Store filtering -->
+            <meta-data
+                android:name="com.google.android.apps.accessibility"
+                android:value="true" />
+        </activity>
+
+        <!-- Declare TTS data check intent -->
+        <meta-data
+            android:name="android.speech.tts.engine"
+            android:value="true" />
+
+    </application>
+
+</manifest>
