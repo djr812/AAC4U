@@ -5,8 +5,12 @@ import androidx.compose.material3.*
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.djrogers.aac4u.ui.grid.components.AACButtonGrid
@@ -20,7 +24,7 @@ import net.djrogers.aac4u.ui.theme.AACColors
  *
  * Layout (tablet, portrait):
  * ┌──────────────────────────────┐
- * │  Sentence Bar          [▶]  │  ← Built sentence + speak button
+ * │ ☰  Sentence Bar        [▶]  │  ← Hamburger + sentence + speak
  * ├──────────────────────────────┤
  * │  Core Vocabulary Bar        │  ← Blue-grey, always visible
  * ├──────────────────────────────┤
@@ -29,9 +33,6 @@ import net.djrogers.aac4u.ui.theme.AACColors
  * │  ┌────┐ ┌────┐ ┌────┐      │
  * │  │happy│ │sad │ │angry│     │  ← Pastel-coloured fringe buttons
  * │  └────┘ └────┘ └────┘      │
- * │  ┌────┐ ┌────┐ ┌────┐      │
- * │  │tired│ │sick│ │hurt │     │
- * │  └────┘ └────┘ └────┘      │
  * ├──────────────────────────────┤
  * │  Predicted: [more] [juice]  │  ← Prediction row
  * └──────────────────────────────┘
@@ -39,10 +40,7 @@ import net.djrogers.aac4u.ui.theme.AACColors
 @Composable
 fun GridScreen(
     windowSizeClass: WindowSizeClass,
-    onNavigateToSettings: () -> Unit,
-    onNavigateToProfiles: () -> Unit,
-    onNavigateToHistory: () -> Unit,
-    onNavigateToQuickPhrases: () -> Unit,
+    onOpenDrawer: () -> Unit,
     viewModel: GridViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -55,14 +53,13 @@ fun GridScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues),
-                contentAlignment = androidx.compose.ui.Alignment.Center
+                contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
             }
             return@Scaffold
         }
 
-        // Determine current category colour for the button grid
         val currentCategoryColor = uiState.currentCategory?.let {
             AACColors.forCategory(it.name)
         } ?: AACColors.forCategory("")
@@ -73,16 +70,37 @@ fun GridScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-            // ── Sentence Bar ──
-            SentenceBar(
-                sentenceParts = uiState.sentenceParts,
-                isSpeaking = uiState.isSpeaking,
-                onSpeak = viewModel::speakSentence,
-                onBackspace = viewModel::removeLastPart,
-                onClear = viewModel::clearSentence,
-                onStop = viewModel::stopSpeaking,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // ── Top Row: Hamburger + Sentence Bar ──
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Hamburger menu button
+                IconButton(
+                    onClick = onOpenDrawer,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Text(
+                        text = "☰",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF616161)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Sentence bar takes remaining space
+                SentenceBar(
+                    sentenceParts = uiState.sentenceParts,
+                    isSpeaking = uiState.isSpeaking,
+                    onSpeak = viewModel::speakSentence,
+                    onBackspace = viewModel::removeLastPart,
+                    onClear = viewModel::clearSentence,
+                    onStop = viewModel::stopSpeaking,
+                    modifier = Modifier.weight(1f)
+                )
+            }
 
             Spacer(modifier = Modifier.height(6.dp))
 

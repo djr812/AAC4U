@@ -1,13 +1,21 @@
 package net.djrogers.aac4u.ui.navigation
 
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import kotlinx.coroutines.launch
+import net.djrogers.aac4u.ui.about.AboutScreen
 import net.djrogers.aac4u.ui.grid.GridScreen
 import net.djrogers.aac4u.ui.history.HistoryScreen
 import net.djrogers.aac4u.ui.profiles.ProfileScreen
@@ -19,51 +27,89 @@ fun AAC4UNavHost(
     windowSizeClass: WindowSizeClass,
     navController: NavHostController = rememberNavController()
 ) {
-    NavHost(
-        navController = navController,
-        startDestination = Screen.Grid.route
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val scope = rememberCoroutineScope()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = navBackStackEntry?.destination?.route
+
+    // Only enable drawer gesture on the grid screen
+    // (prevents accidental swipe-open on other screens)
+    val gesturesEnabled = currentRoute == Screen.Grid.route
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        gesturesEnabled = gesturesEnabled,
+        drawerContent = {
+            DrawerContent(
+                currentRoute = currentRoute,
+                onNavigate = { screen ->
+                    if (screen.route != currentRoute) {
+                        navController.navigate(screen.route) {
+                            // Pop back to grid so the back stack doesn't pile up
+                            popUpTo(Screen.Grid.route) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                },
+                onClose = {
+                    scope.launch { drawerState.close() }
+                }
+            )
+        }
     ) {
-        composable(Screen.Grid.route) {
-            GridScreen(
-                windowSizeClass = windowSizeClass,
-                onNavigateToSettings = { navController.navigate(Screen.Settings.route) },
-                onNavigateToProfiles = { navController.navigate(Screen.Profiles.route) },
-                onNavigateToHistory = { navController.navigate(Screen.History.route) },
-                onNavigateToQuickPhrases = { navController.navigate(Screen.QuickPhrases.route) }
-            )
-        }
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Grid.route
+        ) {
+            composable(Screen.Grid.route) {
+                GridScreen(
+                    windowSizeClass = windowSizeClass,
+                    onOpenDrawer = {
+                        scope.launch { drawerState.open() }
+                    }
+                )
+            }
 
-        composable(Screen.QuickPhrases.route) {
-            QuickPhrasesScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+            composable(Screen.QuickPhrases.route) {
+                QuickPhrasesScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
 
-        composable(Screen.Settings.route) {
-            SettingsScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
 
-        composable(Screen.Profiles.route) {
-            ProfileScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+            composable(Screen.Profiles.route) {
+                ProfileScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
 
-        composable(Screen.History.route) {
-            HistoryScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
-        }
+            composable(Screen.History.route) {
+                HistoryScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
 
-        composable(
-            route = Screen.Editor.route,
-            arguments = listOf(navArgument("categoryId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val categoryId = backStackEntry.arguments?.getLong("categoryId") ?: return@composable
-            // EditorScreen will be implemented in Phase 2
-            // EditorScreen(categoryId = categoryId, onNavigateBack = { navController.popBackStack() })
+            composable(Screen.About.route) {
+                AboutScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(
+                route = Screen.Editor.route,
+                arguments = listOf(navArgument("categoryId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val categoryId = backStackEntry.arguments?.getLong("categoryId") ?: return@composable
+                // EditorScreen — Phase 2
+            }
         }
     }
 }

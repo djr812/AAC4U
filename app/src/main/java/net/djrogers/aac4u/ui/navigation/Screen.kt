@@ -10,6 +10,7 @@ sealed class Screen(val route: String) {
     data object Settings : Screen("settings")
     data object Profiles : Screen("profiles")
     data object History : Screen("history")
+    data object About : Screen("about")
     data object Editor : Screen("editor/{categoryId}") {
         fun createRoute(categoryId: Long) = "editor/$categoryId"
     }

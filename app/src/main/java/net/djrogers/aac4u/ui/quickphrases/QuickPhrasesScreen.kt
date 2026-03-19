@@ -6,7 +6,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,11 +32,31 @@ fun QuickPhrasesScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp)
+                .padding(24.dp)
         ) {
             Text(
-                text = "Quick phrases (I need help, I'm hungry, etc.) will be implemented in Phase 1b",
-                style = MaterialTheme.typography.bodyLarge
+                text = "💬",
+                fontSize = 48.sp
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Quick Phrases",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Tap-to-speak common phrases for quick communication. " +
+                        "This dedicated screen will be available in a future update.\n\n" +
+                        "In the meantime, quick phrases are available in the " +
+                        "\"Quick Phrases\" category on the main grid.",
+                fontSize = 15.sp,
+                color = Color(0xFF757575),
+                lineHeight = 22.sp
             )
         }
     }
