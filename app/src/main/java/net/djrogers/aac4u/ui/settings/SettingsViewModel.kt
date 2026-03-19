@@ -1,6 +1,7 @@
 package net.djrogers.aac4u.ui.settings
 
 import android.speech.tts.Voice
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,7 +35,7 @@ data class TtsSettingsState(
 
 data class VoiceInfo(
     val name: String,
-    val friendlyName: String,
+    val displayName: String,
     val isOffline: Boolean
 )
 
@@ -50,13 +51,16 @@ class SettingsViewModel @Inject constructor(
     private var activeProfile: UserProfile? = null
 
     init {
+        Log.d("AAC4U_VOICE", "SettingsViewModel init called")
         loadSettings()
         observeTtsState()
     }
 
     private fun loadSettings() {
+        Log.d("AAC4U_VOICE", "loadSettings called")
         viewModelScope.launch {
             profileRepository.getActiveProfile().collect { profile ->
+                Log.d("AAC4U_VOICE", "Active profile received: ${profile?.name}")
                 if (profile != null) {
                     activeProfile = profile
                     _state.update { state ->
@@ -77,11 +81,15 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun loadVoices() {
+        Log.d("AAC4U_VOICE", "loadVoices called")
+
         val allVoices = tts.getAllVoices()
+        Log.d("AAC4U_VOICE", "Total voices from TTS engine: ${allVoices.size}")
 
         val englishVoices = allVoices.filter { voice ->
             voice.locale.language == Locale.ENGLISH.language
         }
+        Log.d("AAC4U_VOICE", "English voices: ${englishVoices.size}")
 
         val offlineSorted = englishVoices
             .filter { !it.isNetworkConnectionRequired }
@@ -91,39 +99,46 @@ class SettingsViewModel @Inject constructor(
             .filter { it.isNetworkConnectionRequired }
             .sortedWith(compareBy({ it.locale.displayCountry }, { it.name }))
 
+        val offlineVoices = buildDisplayNames(offlineSorted, isOffline = true)
+        val onlineOnlyVoices = buildDisplayNames(onlineSorted, isOffline = false)
+
+        Log.d("AAC4U_VOICE", "Offline: ${offlineVoices.size}, Online: ${onlineOnlyVoices.size}")
+        offlineVoices.forEach { Log.d("AAC4U_VOICE", "Offline: '${it.displayName}' (${it.name})") }
+
         _state.update { state ->
             state.copy(
-                offlineVoices = buildNumberedVoices(offlineSorted, isOffline = true),
-                onlineOnlyVoices = buildNumberedVoices(onlineSorted, isOffline = false)
+                offlineVoices = offlineVoices,
+                onlineOnlyVoices = onlineOnlyVoices
             )
         }
     }
 
     /**
-     * Number voices per country: Australia 1, Australia 2, US 1, US 2, etc.
-     * If a country only has one voice, skip the number.
+     * Build display names with per-country numbering.
+     * If a country has only one voice, just show "English (Australia)".
+     * If multiple, show "English (Australia) 1", "English (Australia) 2", etc.
      */
-    private fun buildNumberedVoices(voices: List<Voice>, isOffline: Boolean): List<VoiceInfo> {
-        // First pass: count voices per country
-        val countsByCountry = voices.groupBy { it.locale.displayCountry.ifEmpty { "English" } }
+    private fun buildDisplayNames(voices: List<Voice>, isOffline: Boolean): List<VoiceInfo> {
+        // First pass: count how many voices per displayName
+        val counts = voices.groupBy { it.locale.displayName }.mapValues { it.value.size }
 
-        // Second pass: assign numbers
+        // Second pass: assign numbers where needed
         val counters = mutableMapOf<String, Int>()
         return voices.map { voice ->
-            val country = voice.locale.displayCountry.ifEmpty { "English" }
-            val count = counters.getOrDefault(country, 0) + 1
-            counters[country] = count
+            val baseName = voice.locale.displayName
+            val total = counts[baseName] ?: 1
+            val count = (counters[baseName] ?: 0) + 1
+            counters[baseName] = count
 
-            val totalForCountry = countsByCountry[country]?.size ?: 1
-            val friendlyName = if (totalForCountry > 1) {
-                "$country $count"
+            val displayName = if (total > 1) {
+                "$baseName $count"
             } else {
-                country
+                baseName
             }
 
             VoiceInfo(
                 name = voice.name,
-                friendlyName = friendlyName,
+                displayName = displayName,
                 isOffline = isOffline
             )
         }
@@ -132,6 +147,7 @@ class SettingsViewModel @Inject constructor(
     private fun observeTtsState() {
         viewModelScope.launch {
             tts.isReady.collect { ready ->
+                Log.d("AAC4U_VOICE", "TTS isReady changed to: $ready")
                 _state.update { it.copy(isTtsReady = ready) }
                 if (ready) loadVoices()
             }

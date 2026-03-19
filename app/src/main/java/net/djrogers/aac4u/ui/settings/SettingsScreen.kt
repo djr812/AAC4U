@@ -1,12 +1,12 @@
 package net.djrogers.aac4u.ui.settings
 
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -27,11 +28,20 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 private enum class SettingsTab(val label: String, val emoji: String) {
     VOICE("Voice", "🔊"),
     GRID("Grid", "📐"),
-    ACCESSIBILITY("Accessibility", "♿"),
+    ACCESSIBILITY("Access", "♿"),
     BACKUP("Backup", "💾")
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+private sealed class VoiceListItem {
+    data class Header(val text: String, val color: Color) : VoiceListItem()
+    data class VoiceEntry(
+        val voiceName: String,
+        val displayName: String,
+        val isOffline: Boolean
+    ) : VoiceListItem()
+    data object DefaultEntry : VoiceListItem()
+}
+
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
@@ -59,60 +69,56 @@ fun SettingsScreen(
         )
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text("Settings — ${selectedTab.label}")
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        if (state.hasUnsavedChanges) showDiscardDialog = true
-                        else onNavigateBack()
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // ── Tabs ──
-                TabRow(
-                    selectedTabIndex = selectedTab.ordinal,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary,
-                    indicator = {},
-                    divider = { HorizontalDivider(color = Color(0xFFE0E0E0)) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                shadowElevation = 2.dp,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    IconButton(
+                        onClick = {
+                            if (state.hasUnsavedChanges) showDiscardDialog = true
+                            else onNavigateBack()
+                        },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = Color(0xFF616161)
+                        )
+                    }
+
                     SettingsTab.entries.forEach { tab ->
                         val isSelected = tab == selectedTab
-                        Tab(
-                            selected = isSelected,
-                            onClick = { selectedTab = tab }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(8.dp))
+                                .clickable { selectedTab = tab }
+                                .background(
+                                    if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    else Color.Transparent
+                                )
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .padding(horizontal = 4.dp, vertical = 10.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(
-                                        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
-                                        else Color.Transparent
-                                    )
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center
                             ) {
-                                Text(text = tab.emoji, fontSize = 16.sp)
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(text = tab.emoji, fontSize = 15.sp)
+                                Spacer(modifier = Modifier.width(5.dp))
                                 Text(
                                     text = tab.label,
-                                    fontSize = 14.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     color = if (isSelected) MaterialTheme.colorScheme.primary
                                     else Color(0xFF757575)
@@ -121,53 +127,36 @@ fun SettingsScreen(
                         }
                     }
                 }
-
-                // ── Tab Content ──
-                when (selectedTab) {
-                    SettingsTab.VOICE -> VoiceSettingsContent(
-                        state = state,
-                        viewModel = viewModel
-                    )
-                    SettingsTab.GRID -> StubContent(
-                        emoji = "📐",
-                        title = "Grid Layout",
-                        description = "Column count, button size, label visibility, and grid spacing settings will be available here."
-                    )
-                    SettingsTab.ACCESSIBILITY -> StubContent(
-                        emoji = "♿",
-                        title = "Accessibility",
-                        description = "High contrast mode, input method selection (tap, dwell, switch, scanning), and timing adjustments will be available here."
-                    )
-                    SettingsTab.BACKUP -> StubContent(
-                        emoji = "💾",
-                        title = "Backup & Restore",
-                        description = "Export your complete configuration as a backup file, or restore from a previous backup."
-                    )
-                }
             }
 
-            // ── Toast ──
-            AnimatedVisibility(
-                visible = state.showSavedToast,
-                enter = fadeIn() + slideInVertically { -it },
-                exit = fadeOut() + slideOutVertically { -it },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 8.dp)
+            when (selectedTab) {
+                SettingsTab.VOICE -> VoiceSettingsContent(state = state, viewModel = viewModel)
+                SettingsTab.GRID -> StubContent("📐", "Grid Layout", "Column count, button size, label visibility, and grid spacing settings will be available here.")
+                SettingsTab.ACCESSIBILITY -> StubContent("♿", "Accessibility", "High contrast mode, input method selection (tap, dwell, switch, scanning), and timing adjustments will be available here.")
+                SettingsTab.BACKUP -> StubContent("💾", "Backup & Restore", "Export your complete configuration as a backup file, or restore from a previous backup.")
+            }
+        }
+
+        AnimatedVisibility(
+            visible = state.showSavedToast,
+            enter = fadeIn() + slideInVertically { -it },
+            exit = fadeOut() + slideOutVertically { -it },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 60.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color(0xFF43A047),
+                shadowElevation = 4.dp
             ) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color(0xFF43A047),
-                    shadowElevation = 4.dp
-                ) {
-                    Text(
-                        text = "✓  Settings saved",
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
-                    )
-                }
+                Text(
+                    text = "✓  Settings saved",
+                    color = Color.White,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
+                )
             }
         }
     }
@@ -179,13 +168,32 @@ private fun VoiceSettingsContent(
     viewModel: SettingsViewModel
 ) {
     if (!state.isTtsReady) {
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text("Text-to-speech engine is initialising...", fontSize = 14.sp, color = Color(0xFFFF8F00))
         }
         return
+    }
+
+    val voiceListItems = remember(state.offlineVoices, state.onlineOnlyVoices) {
+        val list = mutableListOf<VoiceListItem>()
+
+        list.add(VoiceListItem.DefaultEntry)
+
+        if (state.offlineVoices.isNotEmpty()) {
+            list.add(VoiceListItem.Header("Offline (${state.offlineVoices.size})", Color(0xFF43A047)))
+            state.offlineVoices.forEach { voice ->
+                list.add(VoiceListItem.VoiceEntry(voice.name, voice.displayName, true))
+            }
+        }
+
+        if (state.onlineOnlyVoices.isNotEmpty()) {
+            list.add(VoiceListItem.Header("Online Only (${state.onlineOnlyVoices.size})", Color(0xFFFF8F00)))
+            state.onlineOnlyVoices.forEach { voice ->
+                list.add(VoiceListItem.VoiceEntry(voice.name, voice.displayName, false))
+            }
+        }
+
+        list.toList()
     }
 
     Row(
@@ -201,52 +209,31 @@ private fun VoiceSettingsContent(
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(10.dp))
                 .background(Color(0xFFFAFAFA)),
-            contentPadding = PaddingValues(6.dp),
-            verticalArrangement = Arrangement.spacedBy(1.dp)
+            contentPadding = PaddingValues(6.dp)
         ) {
-            item(key = "__default__") {
-                VoiceRow(
-                    friendlyName = "System Default",
-                    isOffline = true,
-                    isSelected = state.previewVoiceName == null,
-                    showBadge = false,
-                    onClick = { viewModel.setPreviewVoice(null) }
-                )
-            }
-
-            if (state.offlineVoices.isNotEmpty()) {
-                item {
-                    SectionLabel(
-                        text = "Offline (${state.offlineVoices.size})",
-                        color = Color(0xFF43A047)
-                    )
-                }
-                items(items = state.offlineVoices, key = { it.name }) { voice ->
-                    VoiceRow(
-                        friendlyName = voice.friendlyName,
-                        isOffline = true,
-                        isSelected = state.previewVoiceName == voice.name,
-                        showBadge = true,
-                        onClick = { viewModel.setPreviewVoice(voice.name) }
-                    )
-                }
-            }
-
-            if (state.onlineOnlyVoices.isNotEmpty()) {
-                item {
-                    SectionLabel(
-                        text = "Online Only (${state.onlineOnlyVoices.size})",
-                        color = Color(0xFFFF8F00)
-                    )
-                }
-                items(items = state.onlineOnlyVoices, key = { it.name }) { voice ->
-                    VoiceRow(
-                        friendlyName = voice.friendlyName,
-                        isOffline = false,
-                        isSelected = state.previewVoiceName == voice.name,
-                        showBadge = true,
-                        onClick = { viewModel.setPreviewVoice(voice.name) }
-                    )
+            items(count = voiceListItems.size) { index ->
+                when (val item = voiceListItems[index]) {
+                    is VoiceListItem.DefaultEntry -> {
+                        VoiceRow(
+                            label = "System Default",
+                            isOffline = true,
+                            isSelected = state.previewVoiceName == null,
+                            showBadge = false,
+                            onClick = { viewModel.setPreviewVoice(null) }
+                        )
+                    }
+                    is VoiceListItem.Header -> {
+                        SectionLabel(item.text, item.color)
+                    }
+                    is VoiceListItem.VoiceEntry -> {
+                        VoiceRow(
+                            label = item.displayName,
+                            isOffline = item.isOffline,
+                            isSelected = state.previewVoiceName == item.voiceName,
+                            showBadge = true,
+                            onClick = { viewModel.setPreviewVoice(item.voiceName) }
+                        )
+                    }
                 }
             }
         }
@@ -255,8 +242,10 @@ private fun VoiceSettingsContent(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight()
+                .fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ── Sliders Section ──
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
@@ -264,33 +253,35 @@ private fun VoiceSettingsContent(
                 shadowElevation = 1.dp
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    // Speed
                     SliderSetting(
                         label = "Speed",
                         value = state.previewRate,
                         valueLabel = "${state.previewRate}x",
-                        min = 0.5f,
-                        max = 2.0f,
-                        steps = 15,
+                        min = 0.5f, max = 2.0f, steps = 15,
                         onValueChange = viewModel::setPreviewRate
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Pitch
                     SliderSetting(
                         label = "Pitch",
                         value = state.previewPitch,
                         valueLabel = "${state.previewPitch}x",
-                        min = 0.5f,
-                        max = 2.0f,
-                        steps = 15,
+                        min = 0.5f, max = 2.0f, steps = 15,
                         onValueChange = viewModel::setPreviewPitch
                     )
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Test
+            // ── Test / Save / Discard Section ──
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFFFAFAFA),
+                shadowElevation = 1.dp
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    // Test button
                     OutlinedButton(
                         onClick = if (state.isSpeaking) viewModel::stopTest else viewModel::testVoice,
                         modifier = Modifier
@@ -304,9 +295,9 @@ private fun VoiceSettingsContent(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                    // Save / Discard — directly under sliders
+                    // Save / Discard row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -338,7 +329,7 @@ private fun VoiceSettingsContent(
                                 disabledContainerColor = Color(0xFFBDBDBD)
                             )
                         ) {
-                            Text("Save Settings", fontSize = 14.sp, color = Color.White)
+                            Text("Save", fontSize = 14.sp, color = Color.White)
                         }
                     }
                 }
@@ -348,11 +339,7 @@ private fun VoiceSettingsContent(
 }
 
 @Composable
-private fun StubContent(
-    emoji: String,
-    title: String,
-    description: String
-) {
+private fun StubContent(emoji: String, title: String, description: String) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -362,35 +349,21 @@ private fun StubContent(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text = emoji, fontSize = 48.sp)
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = title,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            Text(text = title, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = description,
-                fontSize = 15.sp,
-                color = Color(0xFF757575),
-                lineHeight = 22.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                text = description, fontSize = 15.sp, color = Color(0xFF757575),
+                lineHeight = 22.sp, textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "Coming soon",
-                fontSize = 14.sp,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Medium
-            )
+            Text("Coming soon", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
         }
     }
 }
 
-// ── Shared Components ──
-
 @Composable
 private fun VoiceRow(
-    friendlyName: String,
+    label: String,
     isOffline: Boolean,
     isSelected: Boolean,
     showBadge: Boolean,
@@ -430,10 +403,10 @@ private fun VoiceRow(
         Spacer(modifier = Modifier.width(10.dp))
 
         Text(
-            text = friendlyName,
+            text = label,
             fontSize = 14.sp,
-            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+            color = Color(0xFF2E7D32),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
@@ -458,23 +431,15 @@ private fun VoiceRow(
 @Composable
 private fun SectionLabel(text: String, color: Color) {
     Text(
-        text = text,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        color = color,
-        modifier = Modifier.padding(start = 8.dp, top = 6.dp, bottom = 2.dp)
+        text = text, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = color,
+        modifier = Modifier.padding(start = 8.dp, top = 10.dp, bottom = 4.dp)
     )
 }
 
 @Composable
 private fun SliderSetting(
-    label: String,
-    value: Float,
-    valueLabel: String,
-    min: Float,
-    max: Float,
-    steps: Int,
-    onValueChange: (Float) -> Unit
+    label: String, value: Float, valueLabel: String,
+    min: Float, max: Float, steps: Int, onValueChange: (Float) -> Unit
 ) {
     Column {
         Row(
@@ -482,25 +447,12 @@ private fun SliderSetting(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = label,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color(0xFF616161)
-            )
-            Text(
-                text = valueLabel,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
+            Text(text = label, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xFF616161))
+            Text(text = valueLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }
         Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = min..max,
-            steps = steps,
-            modifier = Modifier.fillMaxWidth()
+            value = value, onValueChange = onValueChange,
+            valueRange = min..max, steps = steps, modifier = Modifier.fillMaxWidth()
         )
     }
 }
