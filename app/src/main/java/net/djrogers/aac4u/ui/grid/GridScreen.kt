@@ -13,6 +13,7 @@ import net.djrogers.aac4u.ui.grid.components.AACButtonGrid
 import net.djrogers.aac4u.ui.grid.components.CategoryTabs
 import net.djrogers.aac4u.ui.grid.components.CoreBar
 import net.djrogers.aac4u.ui.grid.components.SentenceBar
+import net.djrogers.aac4u.ui.theme.AACColors
 
 /**
  * The main communication grid screen.
@@ -21,20 +22,18 @@ import net.djrogers.aac4u.ui.grid.components.SentenceBar
  * ┌──────────────────────────────┐
  * │  Sentence Bar          [▶]  │  ← Built sentence + speak button
  * ├──────────────────────────────┤
- * │  Core Vocabulary Bar        │  ← Always visible (want, go, more...)
+ * │  Core Vocabulary Bar        │  ← Blue-grey, always visible
  * ├──────────────────────────────┤
- * │ Food | People | Feelings |  │  ← Category tabs
+ * │ Feelings│Actions│Food│...   │  ← Coloured category tabs
  * ├──────────────────────────────┤
  * │  ┌────┐ ┌────┐ ┌────┐      │
- * │  │ 🍎 │ │ 🍌 │ │ 🥪 │ ... │  ← Fringe vocabulary grid
- * │  │apple│ │bana│ │sand│      │
+ * │  │happy│ │sad │ │angry│     │  ← Pastel-coloured fringe buttons
  * │  └────┘ └────┘ └────┘      │
  * │  ┌────┐ ┌────┐ ┌────┐      │
- * │  │ 🥛 │ │ 💧 │ │ 🍕 │ ... │
- * │  │milk │ │water│ │pizza│     │
+ * │  │tired│ │sick│ │hurt │     │
  * │  └────┘ └────┘ └────┘      │
  * ├──────────────────────────────┤
- * │  Predicted: [juice] [more]  │  ← Predictions (optional)
+ * │  Predicted: [more] [juice]  │  ← Prediction row
  * └──────────────────────────────┘
  */
 @Composable
@@ -63,11 +62,16 @@ fun GridScreen(
             return@Scaffold
         }
 
+        // Determine current category colour for the button grid
+        val currentCategoryColor = uiState.currentCategory?.let {
+            AACColors.forCategory(it.name)
+        } ?: AACColors.forCategory("")
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 8.dp)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
             // ── Sentence Bar ──
             SentenceBar(
@@ -80,19 +84,20 @@ fun GridScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // ── Core Vocabulary Bar ──
+            // ── Core Vocabulary Bar (distinct blue-grey style) ──
             if (uiState.coreButtons.isNotEmpty()) {
                 CoreBar(
                     buttons = uiState.coreButtons,
                     onButtonTapped = viewModel::onButtonTapped,
+                    isCore = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
             }
 
-            // ── Category Tabs ──
+            // ── Category Tabs (coloured) ──
             if (uiState.categories.isNotEmpty()) {
                 CategoryTabs(
                     categories = uiState.categories,
@@ -100,28 +105,30 @@ fun GridScreen(
                     onCategorySelected = viewModel::selectCategory,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
             }
 
-            // ── Main Button Grid ──
+            // ── Main Button Grid (category-coloured) ──
             AACButtonGrid(
                 buttons = uiState.buttons,
                 columns = uiState.gridColumns,
                 showLabels = uiState.showLabels,
                 isEditMode = uiState.isEditMode,
+                categoryColor = currentCategoryColor,
                 onButtonTapped = viewModel::onButtonTapped,
-                onButtonLongPressed = { /* Open edit dialog — Phase 2 */ },
+                onButtonLongPressed = { /* Phase 2: edit dialog */ },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f) // Take remaining vertical space
+                    .weight(1f)
             )
 
             // ── Prediction Row ──
             if (uiState.predictedButtons.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 CoreBar(
                     buttons = uiState.predictedButtons,
                     onButtonTapped = viewModel::onButtonTapped,
+                    isCore = false,
                     modifier = Modifier.fillMaxWidth()
                 )
             }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import net.djrogers.aac4u.domain.model.AACButton as AACButtonModel
 
@@ -13,7 +14,7 @@ import net.djrogers.aac4u.domain.model.AACButton as AACButtonModel
  * The main communication grid displaying AAC buttons.
  *
  * Grid scales from 3×3 (large buttons, motor impairment) to 6×10 (compact, more vocabulary).
- * Button aspect ratio is roughly 1:1 to maintain consistent touch targets.
+ * Each button is coloured by its category for visual association.
  */
 @Composable
 fun AACButtonGrid(
@@ -21,6 +22,7 @@ fun AACButtonGrid(
     columns: Int,
     showLabels: Boolean,
     isEditMode: Boolean,
+    categoryColor: Color,
     onButtonTapped: (AACButtonModel) -> Unit,
     onButtonLongPressed: (AACButtonModel) -> Unit,
     modifier: Modifier = Modifier
@@ -29,8 +31,8 @@ fun AACButtonGrid(
         columns = GridCells.Fixed(columns.coerceIn(2, 10)),
         modifier = modifier,
         contentPadding = PaddingValues(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         items(
             items = buttons,
@@ -39,11 +41,12 @@ fun AACButtonGrid(
             AACButton(
                 button = button,
                 showLabel = showLabels,
+                categoryColor = categoryColor,
                 onTap = { onButtonTapped(button) },
                 onLongPress = { onButtonLongPressed(button) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(1f) // Keep buttons square
+                    .aspectRatio(1f)
             )
         }
     }
