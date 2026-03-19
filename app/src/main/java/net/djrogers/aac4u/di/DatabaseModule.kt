@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import net.djrogers.aac4u.data.local.database.AAC4UDatabase
 import net.djrogers.aac4u.data.local.database.dao.*
+import net.djrogers.aac4u.data.local.database.migration.Migrations
 import javax.inject.Singleton
 
 @Module
@@ -22,7 +23,10 @@ object DatabaseModule {
             context,
             AAC4UDatabase::class.java,
             AAC4UDatabase.DATABASE_NAME
-        ).build()
+        )
+            .addMigrations(*Migrations.ALL)
+            .fallbackToDestructiveMigration()
+            .build()
     }
 
     @Provides

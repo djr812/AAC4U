@@ -3,16 +3,17 @@ package net.djrogers.aac4u.ui.grid
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import net.djrogers.aac4u.data.tts.AACTextToSpeech
 import net.djrogers.aac4u.domain.model.AACButton
 import net.djrogers.aac4u.domain.model.Category
 import net.djrogers.aac4u.domain.model.VocabularyType
+import net.djrogers.aac4u.domain.repository.ButtonRepository
 import net.djrogers.aac4u.domain.repository.CategoryRepository
 import net.djrogers.aac4u.domain.repository.ProfileRepository
 import net.djrogers.aac4u.domain.usecase.grid.BuildSentenceUseCase
-import net.djrogers.aac4u.domain.usecase.grid.GetGridButtonsUseCase
 import net.djrogers.aac4u.domain.usecase.grid.SelectButtonUseCase
 import net.djrogers.aac4u.domain.usecase.prediction.GetPredictedButtonsUseCase
 import net.djrogers.aac4u.domain.usecase.tts.SpeakPhraseUseCase
@@ -21,11 +22,11 @@ import javax.inject.Inject
 
 @HiltViewModel
 class GridViewModel @Inject constructor(
-    private val getGridButtonsUseCase: GetGridButtonsUseCase,
     private val selectButtonUseCase: SelectButtonUseCase,
     private val buildSentenceUseCase: BuildSentenceUseCase,
     private val speakPhraseUseCase: SpeakPhraseUseCase,
     private val getPredictedButtonsUseCase: GetPredictedButtonsUseCase,
+    private val buttonRepository: ButtonRepository,
     private val categoryRepository: CategoryRepository,
     private val profileRepository: ProfileRepository,
     private val tts: AACTextToSpeech
@@ -34,32 +35,35 @@ class GridViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(GridUiState())
     val uiState: StateFlow<GridUiState> = _uiState.asStateFlow()
 
+    // Track active collection jobs so we can cancel and replace them
+    private var buttonsJob: Job? = null
+    private var coreButtonsJob: Job? = null
+    private var predictionsJob: Job? = null
+
+    // Track active profile ID
+    private var activeProfileId: Long? = null
+
     init {
         observeActiveProfile()
         observeTtsState()
     }
 
-    /**
-     * Watch for active profile changes and load their categories/settings.
-     */
     private fun observeActiveProfile() {
         viewModelScope.launch {
             profileRepository.getActiveProfile().collect { profile ->
                 if (profile != null) {
-                    // Apply profile TTS settings
+                    activeProfileId = profile.id
                     tts.applyProfile(profile.ttsVoiceName, profile.ttsRate, profile.ttsPitch)
 
-                    // Update grid config
                     _uiState.update { state ->
                         state.copy(
                             gridColumns = profile.gridConfig.columns,
-                            showLabels = profile.gridConfig.showLabels,
-                            isLoading = false
+                            showLabels = profile.gridConfig.showLabels
                         )
                     }
 
-                    // Load categories for this profile
                     loadCategories(profile.id)
+                    loadCoreButtons(profile.id)
                 } else {
                     _uiState.update { it.copy(isLoading = false, error = "No active profile") }
                 }
@@ -67,52 +71,41 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Load categories and auto-select the first fringe category.
-     */
     private fun loadCategories(profileId: Long) {
         viewModelScope.launch {
-            categoryRepository.getCategoriesByProfile(profileId).collect { categories ->
-                val fringeCategories = categories.filter { it.vocabularyType == VocabularyType.FRINGE }
-                val currentCategory = _uiState.value.currentCategory
-                    ?: fringeCategories.firstOrNull()
+            categoryRepository.getCategoriesByProfile(profileId).collect { allCategories ->
+                val fringeCategories = allCategories.filter {
+                    it.vocabularyType == VocabularyType.FRINGE
+                }
 
                 _uiState.update { state ->
                     state.copy(categories = fringeCategories)
                 }
 
-                // Select category if none selected
-                if (currentCategory != null) {
-                    selectCategory(currentCategory)
+                // Auto-select first category if none selected
+                if (_uiState.value.currentCategory == null && fringeCategories.isNotEmpty()) {
+                    selectCategory(fringeCategories.first())
                 }
 
-                // Load core vocabulary buttons
-                loadCoreButtons(profileId)
+                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
 
-    /**
-     * Load core vocabulary buttons (always visible at top/bottom of screen).
-     */
     private fun loadCoreButtons(profileId: Long) {
-        viewModelScope.launch {
+        coreButtonsJob?.cancel()
+        coreButtonsJob = viewModelScope.launch {
             categoryRepository.getCategoriesByType(profileId, VocabularyType.CORE).collect { coreCategories ->
-                // Collect buttons from all core categories
-                coreCategories.firstOrNull()?.let { coreCategory ->
-                    getGridButtonsUseCase(coreCategory.id).collect { buttons ->
-                        _uiState.update { state ->
-                            state.copy(coreButtons = buttons)
-                        }
+                val coreCategory = coreCategories.firstOrNull() ?: return@collect
+                buttonRepository.getButtonsByCategory(coreCategory.id).collect { buttons ->
+                    _uiState.update { state ->
+                        state.copy(coreButtons = buttons)
                     }
                 }
             }
         }
     }
 
-    /**
-     * Observe TTS speaking state for UI feedback.
-     */
     private fun observeTtsState() {
         viewModelScope.launch {
             tts.isSpeaking.collect { speaking ->
@@ -128,14 +121,13 @@ class GridViewModel @Inject constructor(
 
     // ── User Actions ──
 
-    /**
-     * User tapped a category tab — load its buttons.
-     */
     fun selectCategory(category: Category) {
         _uiState.update { it.copy(currentCategory = category) }
 
-        viewModelScope.launch {
-            getGridButtonsUseCase(category.id).collect { buttons ->
+        // Cancel previous button collection and start new one
+        buttonsJob?.cancel()
+        buttonsJob = viewModelScope.launch {
+            buttonRepository.getButtonsByCategory(category.id).collect { buttons ->
                 _uiState.update { state ->
                     state.copy(buttons = buttons)
                 }
@@ -143,21 +135,16 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    /**
-     * User tapped an AAC button — add to sentence and optionally speak.
-     */
     fun onButtonTapped(button: AACButton) {
         viewModelScope.launch {
-            val profileId = getCurrentProfileId() ?: return@launch
+            val profileId = activeProfileId ?: return@launch
 
-            // Record usage + prediction data
             selectButtonUseCase(
                 button = button,
                 previousButtonId = _uiState.value.lastTappedButtonId,
                 profileId = profileId
             )
 
-            // Add to sentence builder
             val updatedParts = buildSentenceUseCase.addPart(button.phrase)
 
             _uiState.update { state ->
@@ -167,14 +154,10 @@ class GridViewModel @Inject constructor(
                 )
             }
 
-            // Update predictions based on this button
             updatePredictions(profileId, button.id)
         }
     }
 
-    /**
-     * User tapped the speak button — speak the full sentence.
-     */
     fun speakSentence() {
         val sentence = _uiState.value.fullSentence
         if (sentence.isBlank()) return
@@ -182,22 +165,18 @@ class GridViewModel @Inject constructor(
         tts.speakPhrase(sentence)
 
         viewModelScope.launch {
-            val profileId = getCurrentProfileId() ?: return@launch
+            val profileId = activeProfileId ?: return@launch
             speakPhraseUseCase(sentence, profileId)
         }
 
-        // Clear the sentence bar after speaking
         clearSentence()
     }
 
-    /**
-     * Speak a single button's phrase immediately (tap-to-speak mode).
-     */
     fun speakButtonDirectly(button: AACButton) {
         tts.speakPhrase(button.phrase)
 
         viewModelScope.launch {
-            val profileId = getCurrentProfileId() ?: return@launch
+            val profileId = activeProfileId ?: return@launch
             speakPhraseUseCase(button.phrase, profileId)
             selectButtonUseCase(
                 button = button,
@@ -210,9 +189,6 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Remove the last word from the sentence bar (backspace).
-     */
     fun removeLastPart() {
         val updatedParts = buildSentenceUseCase.removeLastPart()
         _uiState.update { state ->
@@ -220,9 +196,6 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Clear the entire sentence bar.
-     */
     fun clearSentence() {
         val updatedParts = buildSentenceUseCase.clear()
         _uiState.update { state ->
@@ -233,31 +206,20 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Stop TTS playback.
-     */
     fun stopSpeaking() {
         tts.stop()
     }
 
-    /**
-     * Toggle edit mode on/off.
-     */
     fun toggleEditMode() {
         _uiState.update { it.copy(isEditMode = !it.isEditMode) }
     }
 
-    // ── Private helpers ──
-
     private fun updatePredictions(profileId: Long, lastButtonId: Long) {
-        viewModelScope.launch {
+        predictionsJob?.cancel()
+        predictionsJob = viewModelScope.launch {
             getPredictedButtonsUseCase(profileId, lastButtonId).collect { predictions ->
                 _uiState.update { it.copy(predictedButtons = predictions) }
             }
         }
-    }
-
-    private suspend fun getCurrentProfileId(): Long? {
-        return profileRepository.getActiveProfile().first()?.id
     }
 }
