@@ -168,8 +168,6 @@ class GridViewModel @Inject constructor(
             val profileId = activeProfileId ?: return@launch
             speakPhraseUseCase(sentence, profileId)
         }
-
-        clearSentence()
     }
 
     fun speakButtonDirectly(button: AACButton) {
