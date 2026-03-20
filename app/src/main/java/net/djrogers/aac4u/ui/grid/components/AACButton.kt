@@ -1,5 +1,6 @@
 package net.djrogers.aac4u.ui.grid.components
 
+import android.view.SoundEffectConstants
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -19,8 +20,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -48,6 +52,8 @@ fun AACButton(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
 
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.93f else 1f,
@@ -68,7 +74,6 @@ fun AACButton(
     val displayColor = if (isPressed) AACColors.pressed(resolvedBgColor) else resolvedBgColor
     val textColor = AACColors.textOn(resolvedBgColor)
 
-    // Edit mode border colour
     val borderColor = if (isEditMode) Color(0xFFFF8F00) else Color(0x15000000)
     val borderWidth = if (isEditMode) 2.dp else 1.dp
 
@@ -95,8 +100,17 @@ fun AACButton(
             .combinedClickable(
                 interactionSource = interactionSource,
                 indication = null,
-                onClick = onTap,
-                onLongClick = onLongPress
+                onClick = {
+                    // Haptic feedback — subtle tick
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    // Click sound — system 'toc' effect
+                    view.playSoundEffect(SoundEffectConstants.CLICK)
+                    onTap()
+                },
+                onLongClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onLongPress()
+                }
             )
             .padding(4.dp),
         contentAlignment = Alignment.Center
@@ -151,7 +165,6 @@ fun AACButton(
             }
         }
 
-        // Edit mode indicator — small pencil in top-right corner
         if (isEditMode) {
             Box(
                 modifier = Modifier
