@@ -4,9 +4,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -32,9 +30,17 @@ fun AAC4UNavHost(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
-    // Only enable drawer gesture on the grid screen
-    // (prevents accidental swipe-open on other screens)
     val gesturesEnabled = currentRoute == Screen.Grid.route
+
+    // Edit mode state — lives here so it persists across drawer open/close
+    var isEditMode by remember { mutableStateOf(false) }
+
+    // Exit edit mode when navigating away from grid
+    LaunchedEffect(currentRoute) {
+        if (currentRoute != Screen.Grid.route) {
+            isEditMode = false
+        }
+    }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -42,10 +48,10 @@ fun AAC4UNavHost(
         drawerContent = {
             DrawerContent(
                 currentRoute = currentRoute,
+                isEditMode = isEditMode,
                 onNavigate = { screen ->
                     if (screen.route != currentRoute) {
                         navController.navigate(screen.route) {
-                            // Pop back to grid so the back stack doesn't pile up
                             popUpTo(Screen.Grid.route) {
                                 saveState = true
                             }
@@ -53,6 +59,9 @@ fun AAC4UNavHost(
                             restoreState = true
                         }
                     }
+                },
+                onToggleEditMode = {
+                    isEditMode = !isEditMode
                 },
                 onClose = {
                     scope.launch { drawerState.close() }
@@ -67,6 +76,8 @@ fun AAC4UNavHost(
             composable(Screen.Grid.route) {
                 GridScreen(
                     windowSizeClass = windowSizeClass,
+                    isEditMode = isEditMode,
+                    onToggleEditMode = { isEditMode = !isEditMode },
                     onOpenDrawer = {
                         scope.launch { drawerState.open() }
                     }
@@ -108,7 +119,6 @@ fun AAC4UNavHost(
                 arguments = listOf(navArgument("categoryId") { type = NavType.LongType })
             ) { backStackEntry ->
                 val categoryId = backStackEntry.arguments?.getLong("categoryId") ?: return@composable
-                // EditorScreen — Phase 2
             }
         }
     }

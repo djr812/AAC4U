@@ -9,6 +9,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -34,27 +35,13 @@ import coil.request.ImageRequest
 import net.djrogers.aac4u.domain.model.AACButton as AACButtonModel
 import net.djrogers.aac4u.ui.theme.AACColors
 
-/**
- * A single AAC communication button with category-coloured background.
- *
- * Visual design:
- * - Soft pastel background colour based on category
- * - Rounded corners with subtle shadow
- * - Press animation (slight scale down + colour darken)
- * - Large readable text centred in the button
- * - Optional symbol image above the text label
- *
- * Accessibility:
- * - Full contentDescription for TalkBack
- * - Role.Button for switch access
- * - Minimum 48dp touch target (enforced by grid sizing)
- */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AACButton(
     button: AACButtonModel,
     showLabel: Boolean = true,
     categoryColor: Color = AACColors.forCategory(""),
+    isEditMode: Boolean = false,
     onTap: () -> Unit,
     onLongPress: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -62,14 +49,12 @@ fun AACButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    // Animate scale on press for tactile feedback
     val scale by animateFloatAsState(
         targetValue = if (isPressed) 0.93f else 1f,
         animationSpec = spring(dampingRatio = 0.6f, stiffness = 400f),
         label = "buttonScale"
     )
 
-    // Determine background colour
     val resolvedBgColor = if (button.backgroundColor != null) {
         try {
             Color(android.graphics.Color.parseColor(button.backgroundColor))
@@ -83,6 +68,10 @@ fun AACButton(
     val displayColor = if (isPressed) AACColors.pressed(resolvedBgColor) else resolvedBgColor
     val textColor = AACColors.textOn(resolvedBgColor)
 
+    // Edit mode border colour
+    val borderColor = if (isEditMode) Color(0xFFFF8F00) else Color(0x15000000)
+    val borderWidth = if (isEditMode) 2.dp else 1.dp
+
     Box(
         modifier = modifier
             .scale(scale)
@@ -95,8 +84,8 @@ fun AACButton(
             .clip(MaterialTheme.shapes.medium)
             .background(displayColor)
             .border(
-                width = 1.dp,
-                color = Color(0x15000000), // Very subtle border
+                width = borderWidth,
+                color = borderColor,
                 shape = MaterialTheme.shapes.medium
             )
             .semantics {
@@ -105,7 +94,7 @@ fun AACButton(
             }
             .combinedClickable(
                 interactionSource = interactionSource,
-                indication = null, // We handle visual feedback via scale + colour
+                indication = null,
                 onClick = onTap,
                 onLongClick = onLongPress
             )
@@ -117,7 +106,6 @@ fun AACButton(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // ── Symbol Image (when available) ──
             if (button.imagePath != null) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -132,7 +120,6 @@ fun AACButton(
                         .padding(4.dp)
                 )
 
-                // Label below image
                 if (showLabel) {
                     Text(
                         text = button.label,
@@ -148,8 +135,6 @@ fun AACButton(
                     )
                 }
             } else {
-                // ── Text-only button (no image) ──
-                // Show the label large and centred
                 Text(
                     text = button.label,
                     color = textColor,
@@ -162,6 +147,24 @@ fun AACButton(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp)
+                )
+            }
+        }
+
+        // Edit mode indicator — small pencil in top-right corner
+        if (isEditMode) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(2.dp)
+                    .size(20.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xCCFF8F00)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "✏",
+                    fontSize = 11.sp
                 )
             }
         }

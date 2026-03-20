@@ -10,23 +10,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/**
- * Content for the navigation drawer (hamburger menu).
- *
- * Menu items:
- * - Quick Phrases
- * - Speech History
- * - Profiles
- * - Settings
- * - About
- *
- * Design: Clean, large touch targets, minimal depth.
- * The drawer slides in from the left and overlays the grid.
- */
 @Composable
 fun DrawerContent(
     currentRoute: String?,
+    isEditMode: Boolean,
     onNavigate: (Screen) -> Unit,
+    onToggleEditMode: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -60,11 +49,26 @@ fun DrawerContent(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // ── Menu Items ──
+        // ── Edit Mode Toggle ──
+        DrawerMenuItem(
+            label = if (isEditMode) "Exit Edit Mode" else "Edit Mode",
+            emoji = if (isEditMode) "✅" else "✏️",
+            isSelected = isEditMode,
+            onClick = {
+                onToggleEditMode()
+                onClose()
+            }
+        )
+
+        HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        // ── Navigation Items ──
 
         DrawerMenuItem(
             label = "Quick Phrases",
-            emoji = "\uD83D\uDCAC", // 💬
+            emoji = "\uD83D\uDCAC",
             isSelected = currentRoute == Screen.QuickPhrases.route,
             onClick = {
                 onNavigate(Screen.QuickPhrases)
@@ -74,7 +78,7 @@ fun DrawerContent(
 
         DrawerMenuItem(
             label = "Speech History",
-            emoji = "\uD83D\uDCDC", // 📜
+            emoji = "\uD83D\uDCDC",
             isSelected = currentRoute == Screen.History.route,
             onClick = {
                 onNavigate(Screen.History)
@@ -84,7 +88,7 @@ fun DrawerContent(
 
         DrawerMenuItem(
             label = "Profiles",
-            emoji = "\uD83D\uDC64", // 👤
+            emoji = "\uD83D\uDC64",
             isSelected = currentRoute == Screen.Profiles.route,
             onClick = {
                 onNavigate(Screen.Profiles)
@@ -94,7 +98,7 @@ fun DrawerContent(
 
         DrawerMenuItem(
             label = "Settings",
-            emoji = "⚙\uFE0F", // ⚙️
+            emoji = "⚙\uFE0F",
             isSelected = currentRoute == Screen.Settings.route,
             onClick = {
                 onNavigate(Screen.Settings)
@@ -108,7 +112,7 @@ fun DrawerContent(
 
         DrawerMenuItem(
             label = "About",
-            emoji = "ℹ\uFE0F", // ℹ️
+            emoji = "ℹ\uFE0F",
             isSelected = currentRoute == Screen.About.route,
             onClick = {
                 onNavigate(Screen.About)
@@ -116,10 +120,8 @@ fun DrawerContent(
             }
         )
 
-        // Push the grid button to the bottom
         Spacer(modifier = Modifier.weight(1f))
 
-        // ── Return to Grid ──
         DrawerMenuItem(
             label = "Communication Grid",
             emoji = "🏠",
@@ -147,10 +149,7 @@ private fun DrawerMenuItem(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = emoji,
-                    fontSize = 20.sp
-                )
+                Text(text = emoji, fontSize = 20.sp)
                 Text(
                     text = label,
                     fontSize = 16.sp,

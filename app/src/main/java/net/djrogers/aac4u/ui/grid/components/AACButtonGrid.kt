@@ -10,12 +10,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import net.djrogers.aac4u.domain.model.AACButton as AACButtonModel
 
-/**
- * The main communication grid displaying AAC buttons.
- *
- * Grid scales from 3×3 (large buttons, motor impairment) to 6×10 (compact, more vocabulary).
- * Each button is coloured by its category for visual association.
- */
 @Composable
 fun AACButtonGrid(
     buttons: List<AACButtonModel>,
@@ -42,6 +36,7 @@ fun AACButtonGrid(
                 button = button,
                 showLabel = showLabels,
                 categoryColor = categoryColor,
+                isEditMode = isEditMode,
                 onTap = { onButtonTapped(button) },
                 onLongPress = { onButtonLongPressed(button) },
                 modifier = Modifier
