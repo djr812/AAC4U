@@ -9,6 +9,8 @@ import androidx.room.PrimaryKey
 data class ProfileEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
+    val avatar: String = "😊",
+    val ageRange: String = "ADULT",
     val gridColumns: Int = 4,
     val gridRows: Int = 4,
     val buttonPaddingDp: Int = 4,

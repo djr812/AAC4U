@@ -13,8 +13,8 @@ import net.djrogers.aac4u.data.local.database.entity.*
         PhraseHistoryEntity::class,
         PredictionEntity::class
     ],
-    version = 1,
-    exportSchema = true // Always export — needed for migration testing
+    version = 2,
+    exportSchema = true
 )
 abstract class AAC4UDatabase : RoomDatabase() {
     abstract fun buttonDao(): ButtonDao
