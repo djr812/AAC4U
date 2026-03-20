@@ -35,12 +35,11 @@ class GridViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(GridUiState())
     val uiState: StateFlow<GridUiState> = _uiState.asStateFlow()
 
-    // Track active collection jobs so we can cancel and replace them
     private var buttonsJob: Job? = null
     private var coreButtonsJob: Job? = null
+    private var categoriesJob: Job? = null
     private var predictionsJob: Job? = null
 
-    // Track active profile ID
     private var activeProfileId: Long? = null
 
     init {
@@ -52,8 +51,15 @@ class GridViewModel @Inject constructor(
         viewModelScope.launch {
             profileRepository.getActiveProfile().collect { profile ->
                 if (profile != null) {
+                    val profileChanged = activeProfileId != null && activeProfileId != profile.id
                     activeProfileId = profile.id
+
                     tts.applyProfile(profile.ttsVoiceName, profile.ttsRate, profile.ttsPitch)
+
+                    // If profile changed, fully reset the grid
+                    if (profileChanged) {
+                        resetGridState()
+                    }
 
                     _uiState.update { state ->
                         state.copy(
@@ -71,23 +77,57 @@ class GridViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Fully reset the grid when switching profiles.
+     * Cancels all active jobs, clears state, clears sentence builder.
+     */
+    private fun resetGridState() {
+        buttonsJob?.cancel()
+        coreButtonsJob?.cancel()
+        categoriesJob?.cancel()
+        predictionsJob?.cancel()
+
+        buildSentenceUseCase.clear()
+
+        _uiState.value = GridUiState(
+            isLoading = true,
+            isTtsReady = _uiState.value.isTtsReady
+        )
+    }
+
     private fun loadCategories(profileId: Long) {
-        viewModelScope.launch {
+        categoriesJob?.cancel()
+        categoriesJob = viewModelScope.launch {
             categoryRepository.getCategoriesByProfile(profileId).collect { allCategories ->
                 val fringeCategories = allCategories.filter {
                     it.vocabularyType == VocabularyType.FRINGE
                 }
 
                 _uiState.update { state ->
-                    state.copy(categories = fringeCategories)
+                    state.copy(
+                        categories = fringeCategories,
+                        isLoading = false
+                    )
                 }
 
-                // Auto-select first category if none selected
-                if (_uiState.value.currentCategory == null && fringeCategories.isNotEmpty()) {
+                // Auto-select first category if none selected or previous selection
+                // doesn't belong to this profile
+                val currentCategory = _uiState.value.currentCategory
+                val shouldReselect = currentCategory == null ||
+                        fringeCategories.none { it.id == currentCategory.id }
+
+                if (shouldReselect && fringeCategories.isNotEmpty()) {
                     selectCategory(fringeCategories.first())
+                } else if (shouldReselect && fringeCategories.isEmpty()) {
+                    // Empty profile — clear buttons
+                    buttonsJob?.cancel()
+                    _uiState.update { state ->
+                        state.copy(
+                            currentCategory = null,
+                            buttons = emptyList()
+                        )
+                    }
                 }
-
-                _uiState.update { it.copy(isLoading = false) }
             }
         }
     }
@@ -96,10 +136,17 @@ class GridViewModel @Inject constructor(
         coreButtonsJob?.cancel()
         coreButtonsJob = viewModelScope.launch {
             categoryRepository.getCategoriesByType(profileId, VocabularyType.CORE).collect { coreCategories ->
-                val coreCategory = coreCategories.firstOrNull() ?: return@collect
-                buttonRepository.getButtonsByCategory(coreCategory.id).collect { buttons ->
+                val coreCategory = coreCategories.firstOrNull()
+                if (coreCategory != null) {
+                    buttonRepository.getButtonsByCategory(coreCategory.id).collect { buttons ->
+                        _uiState.update { state ->
+                            state.copy(coreButtons = buttons)
+                        }
+                    }
+                } else {
+                    // No core category for this profile
                     _uiState.update { state ->
-                        state.copy(coreButtons = buttons)
+                        state.copy(coreButtons = emptyList())
                     }
                 }
             }
@@ -124,7 +171,6 @@ class GridViewModel @Inject constructor(
     fun selectCategory(category: Category) {
         _uiState.update { it.copy(currentCategory = category) }
 
-        // Cancel previous button collection and start new one
         buttonsJob?.cancel()
         buttonsJob = viewModelScope.launch {
             buttonRepository.getButtonsByCategory(category.id).collect { buttons ->

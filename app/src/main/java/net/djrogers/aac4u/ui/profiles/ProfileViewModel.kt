@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import net.djrogers.aac4u.domain.model.AgeRange
 import net.djrogers.aac4u.domain.model.UserProfile
+import net.djrogers.aac4u.domain.repository.ButtonRepository
+import net.djrogers.aac4u.domain.repository.CategoryRepository
 import net.djrogers.aac4u.domain.repository.ProfileRepository
 import javax.inject.Inject
 
@@ -28,7 +30,9 @@ data class ProfileDialogState(
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val profileRepository: ProfileRepository
+    private val profileRepository: ProfileRepository,
+    private val categoryRepository: CategoryRepository,
+    private val buttonRepository: ButtonRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfilesUiState())
@@ -110,13 +114,18 @@ class ProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             if (state.isNewProfile) {
-                val newProfile = UserProfile(
-                    name = name,
-                    avatar = state.avatar,
-                    ageRange = state.ageRange,
-                    isActive = false
+                // Create the new profile
+                val newProfileId = profileRepository.insertProfile(
+                    UserProfile(
+                        name = name,
+                        avatar = state.avatar,
+                        ageRange = state.ageRange,
+                        isActive = false
+                    )
                 )
-                profileRepository.insertProfile(newProfile)
+
+                // Copy vocabulary from the default (first) profile
+                copyVocabularyFromDefault(newProfileId)
             } else {
                 val existing = state.editingProfile ?: return@launch
                 profileRepository.updateProfile(
@@ -131,19 +140,58 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Copies all categories and buttons from the first profile (Default)
+     * into the new profile. Each category and button gets a new ID,
+     * so edits to the copy don't affect the original.
+     */
+    private suspend fun copyVocabularyFromDefault(newProfileId: Long) {
+        // Find the default profile (first one created, or first in the list)
+        val allProfiles = _uiState.value.profiles
+        val sourceProfile = allProfiles.firstOrNull() ?: return
+
+        // Get all categories for the source profile
+        val sourceCategories = categoryRepository
+            .getCategoriesByProfile(sourceProfile.id)
+            .first()
+
+        // For each category, create a copy and copy its buttons
+        for (sourceCategory in sourceCategories) {
+            val newCategoryId = categoryRepository.insertCategory(
+                sourceCategory.copy(
+                    id = 0, // Room will auto-generate a new ID
+                    profileId = newProfileId
+                )
+            )
+
+            // Get all buttons in this category (including hidden ones)
+            val sourceButtons = buttonRepository
+                .getButtonsByCategory(sourceCategory.id)
+                .first()
+
+            // Copy each button into the new category
+            for (button in sourceButtons) {
+                buttonRepository.insertButton(
+                    button.copy(
+                        id = 0, // Room will auto-generate a new ID
+                        categoryId = newCategoryId
+                    )
+                )
+            }
+        }
+    }
+
     fun deleteProfile() {
         val state = _dialogState.value
         val profile = state.editingProfile ?: return
 
         viewModelScope.launch {
-            // Don't delete the last profile
             val allProfiles = _uiState.value.profiles
             if (allProfiles.size <= 1) {
                 hideDeleteConfirmation()
                 return@launch
             }
 
-            // If deleting the active profile, switch to another one first
             if (profile.isActive) {
                 val nextProfile = allProfiles.first { it.id != profile.id }
                 profileRepository.setActiveProfile(nextProfile.id)
