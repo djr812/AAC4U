@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import net.djrogers.aac4u.data.local.database.AAC4UDatabase
 import net.djrogers.aac4u.domain.model.AgeRange
 import net.djrogers.aac4u.domain.model.UserProfile
 import net.djrogers.aac4u.domain.repository.ButtonRepository
@@ -32,7 +33,8 @@ data class ProfileDialogState(
 class ProfileViewModel @Inject constructor(
     private val profileRepository: ProfileRepository,
     private val categoryRepository: CategoryRepository,
-    private val buttonRepository: ButtonRepository
+    private val buttonRepository: ButtonRepository,
+    private val database: AAC4UDatabase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfilesUiState())
@@ -63,8 +65,6 @@ class ProfileViewModel @Inject constructor(
             profileRepository.setActiveProfile(profileId)
         }
     }
-
-    // ── Dialog actions ──
 
     fun showCreateDialog() {
         _dialogState.value = ProfileDialogState(
@@ -114,7 +114,6 @@ class ProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             if (state.isNewProfile) {
-                // Create the new profile
                 val newProfileId = profileRepository.insertProfile(
                     UserProfile(
                         name = name,
@@ -124,8 +123,8 @@ class ProfileViewModel @Inject constructor(
                     )
                 )
 
-                // Copy vocabulary from the default (first) profile
-                copyVocabularyFromDefault(newProfileId)
+                // Copy vocabulary from the first (Default) profile
+                copyVocabularyToNewProfile(newProfileId)
             } else {
                 val existing = state.editingProfile ?: return@launch
                 profileRepository.updateProfile(
@@ -141,39 +140,39 @@ class ProfileViewModel @Inject constructor(
     }
 
     /**
-     * Copies all categories and buttons from the first profile (Default)
-     * into the new profile. Each category and button gets a new ID,
-     * so edits to the copy don't affect the original.
+     * Copies all categories and buttons from the Default profile (first profile)
+     * into a new profile using direct DAO access to ensure ALL buttons are copied,
+     * including hidden ones.
+     *
+     * Each category and button gets a brand new ID so they are completely
+     * independent — edits to one profile never affect another.
      */
-    private suspend fun copyVocabularyFromDefault(newProfileId: Long) {
-        // Find the default profile (first one created, or first in the list)
+    private suspend fun copyVocabularyToNewProfile(newProfileId: Long) {
         val allProfiles = _uiState.value.profiles
         val sourceProfile = allProfiles.firstOrNull() ?: return
 
-        // Get all categories for the source profile
-        val sourceCategories = categoryRepository
-            .getCategoriesByProfile(sourceProfile.id)
-            .first()
+        val categoryDao = database.categoryDao()
+        val buttonDao = database.buttonDao()
 
-        // For each category, create a copy and copy its buttons
+        // Get ALL categories for source profile (including hidden ones)
+        val sourceCategories = categoryDao.getAllCategoriesByProfile(sourceProfile.id).first()
+
         for (sourceCategory in sourceCategories) {
-            val newCategoryId = categoryRepository.insertCategory(
+            // Insert a copy of the category with new ID and new profileId
+            val newCategoryId = categoryDao.insertCategory(
                 sourceCategory.copy(
-                    id = 0, // Room will auto-generate a new ID
+                    id = 0,
                     profileId = newProfileId
                 )
             )
 
-            // Get all buttons in this category (including hidden ones)
-            val sourceButtons = buttonRepository
-                .getButtonsByCategory(sourceCategory.id)
-                .first()
+            // Get ALL buttons in this category (including hidden ones)
+            val sourceButtons = buttonDao.getAllButtonsByCategory(sourceCategory.id).first()
 
-            // Copy each button into the new category
-            for (button in sourceButtons) {
-                buttonRepository.insertButton(
-                    button.copy(
-                        id = 0, // Room will auto-generate a new ID
+            for (sourceButton in sourceButtons) {
+                buttonDao.insertButton(
+                    sourceButton.copy(
+                        id = 0,
                         categoryId = newCategoryId
                     )
                 )

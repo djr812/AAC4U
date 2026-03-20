@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -32,7 +33,6 @@ fun ProfileScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val dialogState by viewModel.dialogState.collectAsStateWithLifecycle()
 
-    // Edit dialog
     ProfileEditDialog(
         state = dialogState,
         onNameChanged = viewModel::updateName,
@@ -44,6 +44,9 @@ fun ProfileScreen(
         onCancelDelete = viewModel::hideDeleteConfirmation,
         onDismiss = viewModel::dismissDialog
     )
+
+    // Filter out the Default template profile
+    val visibleProfiles = uiState.profiles.filter { it.name != "Default" }
 
     Scaffold(
         topBar = {
@@ -78,35 +81,75 @@ fun ProfileScreen(
             return@Scaffold
         }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            contentPadding = PaddingValues(vertical = 12.dp)
-        ) {
-            items(
-                items = uiState.profiles,
-                key = { it.id }
-            ) { profile ->
-                ProfileCard(
-                    profile = profile,
-                    isActive = profile.id == uiState.activeProfileId,
-                    onSwitch = { viewModel.switchProfile(profile.id) },
-                    onEdit = { viewModel.showEditDialog(profile) }
-                )
+        if (visibleProfiles.isEmpty()) {
+            // No user profiles yet — prompt to create one
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(32.dp)
+                ) {
+                    Text(text = "👤", fontSize = 48.sp)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No profiles yet",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Create a profile to get started. Each profile has its own vocabulary, settings, and customisations.",
+                        fontSize = 15.sp,
+                        color = Color(0xFF757575),
+                        textAlign = TextAlign.Center,
+                        lineHeight = 22.sp
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Button(
+                        onClick = viewModel::showCreateDialog,
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF43A047)
+                        )
+                    ) {
+                        Text("＋ Create Profile", fontSize = 15.sp, color = Color.White)
+                    }
+                }
             }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 12.dp)
+            ) {
+                items(
+                    items = visibleProfiles,
+                    key = { it.id }
+                ) { profile ->
+                    ProfileCard(
+                        profile = profile,
+                        isActive = profile.id == uiState.activeProfileId,
+                        onSwitch = { viewModel.switchProfile(profile.id) },
+                        onEdit = { viewModel.showEditDialog(profile) }
+                    )
+                }
 
-            // Hint at bottom
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Tap a profile to switch. Tap the edit button to rename or customise.",
-                    fontSize = 13.sp,
-                    color = Color(0xFF9E9E9E),
-                    modifier = Modifier.padding(horizontal = 8.dp)
-                )
+                item {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Tap a profile to switch. Tap the edit button to rename or customise.",
+                        fontSize = 13.sp,
+                        color = Color(0xFF9E9E9E),
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                }
             }
         }
     }
@@ -145,7 +188,6 @@ private fun ProfileCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar
             Box(
                 modifier = Modifier
                     .size(52.dp)
@@ -160,13 +202,12 @@ private fun ProfileCard(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Info
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = profile.name,
                     fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF2E7D32)
                 )
 
                 Spacer(modifier = Modifier.height(2.dp))
@@ -175,7 +216,6 @@ private fun ProfileCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Age range badge
                     Text(
                         text = "Age ${profile.ageRange.label}",
                         fontSize = 12.sp,
@@ -186,7 +226,6 @@ private fun ProfileCard(
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     )
 
-                    // Active badge
                     if (isActive) {
                         Text(
                             text = "Active",
@@ -202,7 +241,6 @@ private fun ProfileCard(
                 }
             }
 
-            // Edit button
             OutlinedButton(
                 onClick = onEdit,
                 modifier = Modifier.height(36.dp),

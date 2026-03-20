@@ -13,6 +13,11 @@
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.AnnotationsKt
 
+# SQLCipher
+-keep class net.sqlcipher.** { *; }
+-keep class net.sqlcipher.database.** { *; }
+-dontwarn net.sqlcipher.**
+
 # Keep our domain models (used in backup/restore serialization)
 -keep class net.djrogers.aac4u.domain.model.** { *; }
 -keep class net.djrogers.aac4u.data.local.database.entity.** { *; }

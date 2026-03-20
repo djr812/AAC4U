@@ -9,6 +9,9 @@ interface ButtonDao {
     @Query("SELECT * FROM buttons WHERE categoryId = :categoryId AND isVisible = 1 ORDER BY sortOrder ASC")
     fun getButtonsByCategory(categoryId: Long): Flow<List<ButtonEntity>>
 
+    @Query("SELECT * FROM buttons WHERE categoryId = :categoryId ORDER BY sortOrder ASC")
+    fun getAllButtonsByCategory(categoryId: Long): Flow<List<ButtonEntity>>
+
     @Query("""
         SELECT b.* FROM buttons b 
         INNER JOIN categories c ON b.categoryId = c.id 
@@ -48,6 +51,9 @@ interface ButtonDao {
 interface CategoryDao {
     @Query("SELECT * FROM categories WHERE profileId = :profileId AND isVisible = 1 ORDER BY sortOrder ASC")
     fun getCategoriesByProfile(profileId: Long): Flow<List<CategoryEntity>>
+
+    @Query("SELECT * FROM categories WHERE profileId = :profileId ORDER BY sortOrder ASC")
+    fun getAllCategoriesByProfile(profileId: Long): Flow<List<CategoryEntity>>
 
     @Query("SELECT * FROM categories WHERE profileId = :profileId AND vocabularyType = :type AND isVisible = 1 ORDER BY sortOrder ASC")
     fun getCategoriesByType(profileId: Long, type: String): Flow<List<CategoryEntity>>

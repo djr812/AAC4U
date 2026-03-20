@@ -84,6 +84,10 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
+    // SQLCipher (database encryption)
+    implementation(libs.sqlcipher)
+    implementation(libs.sqlite.ktx)
+
     // DataStore
     implementation(libs.datastore.preferences)
 

@@ -8,8 +8,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import net.djrogers.aac4u.data.local.database.AAC4UDatabase
+import net.djrogers.aac4u.data.local.database.DatabaseKeyManager
 import net.djrogers.aac4u.data.local.database.dao.*
 import net.djrogers.aac4u.data.local.database.migration.Migrations
+import net.sqlcipher.database.SupportFactory
 import javax.inject.Singleton
 
 @Module
@@ -18,12 +20,20 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): AAC4UDatabase {
+    fun provideDatabase(
+        @ApplicationContext context: Context,
+        keyManager: DatabaseKeyManager
+    ): AAC4UDatabase {
+        // Get the encryption passphrase from the Keystore-backed key manager
+        val passphrase = keyManager.getPassphrase()
+        val factory = SupportFactory(passphrase)
+
         return Room.databaseBuilder(
             context,
             AAC4UDatabase::class.java,
             AAC4UDatabase.DATABASE_NAME
         )
+            .openHelperFactory(factory)
             .addMigrations(*Migrations.ALL)
             .fallbackToDestructiveMigration()
             .build()
