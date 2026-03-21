@@ -60,6 +60,17 @@ fun DrawerContent(
             }
         )
 
+        // ── Core Words Editor ──
+        DrawerMenuItem(
+            label = "Core Words",
+            emoji = "⭐",
+            isSelected = currentRoute == Screen.CoreWordsEditor.route,
+            onClick = {
+                onNavigate(Screen.CoreWordsEditor)
+                onClose()
+            }
+        )
+
         HorizontalDivider(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )

@@ -14,6 +14,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import kotlinx.coroutines.launch
 import net.djrogers.aac4u.ui.about.AboutScreen
+import net.djrogers.aac4u.ui.editor.CoreWordsEditorScreen
 import net.djrogers.aac4u.ui.grid.GridScreen
 import net.djrogers.aac4u.ui.history.HistoryScreen
 import net.djrogers.aac4u.ui.profiles.ProfileScreen
@@ -32,10 +33,8 @@ fun AAC4UNavHost(
 
     val gesturesEnabled = currentRoute == Screen.Grid.route
 
-    // Edit mode state — lives here so it persists across drawer open/close
     var isEditMode by remember { mutableStateOf(false) }
 
-    // Exit edit mode when navigating away from grid
     LaunchedEffect(currentRoute) {
         if (currentRoute != Screen.Grid.route) {
             isEditMode = false
@@ -110,6 +109,12 @@ fun AAC4UNavHost(
 
             composable(Screen.About.route) {
                 AboutScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.CoreWordsEditor.route) {
+                CoreWordsEditorScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

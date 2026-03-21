@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.djrogers.aac4u.ui.editor.ButtonEditDialog
+import net.djrogers.aac4u.ui.editor.CategoryEditDialog
+import net.djrogers.aac4u.ui.editor.CategoryEditorViewModel
 import net.djrogers.aac4u.ui.editor.EditorViewModel
 import net.djrogers.aac4u.ui.grid.components.AACButtonGrid
 import net.djrogers.aac4u.ui.grid.components.CategoryTabs
@@ -32,12 +34,14 @@ fun GridScreen(
     onToggleEditMode: () -> Unit,
     onOpenDrawer: () -> Unit,
     viewModel: GridViewModel = hiltViewModel(),
-    editorViewModel: EditorViewModel = hiltViewModel()
+    editorViewModel: EditorViewModel = hiltViewModel(),
+    categoryEditorViewModel: CategoryEditorViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val editState by editorViewModel.editState.collectAsStateWithLifecycle()
+    val categoryDialogState by categoryEditorViewModel.dialogState.collectAsStateWithLifecycle()
 
-    // Edit dialog
+    // Button edit dialog
     ButtonEditDialog(
         state = editState,
         onLabelChanged = editorViewModel::updateLabel,
@@ -49,6 +53,18 @@ fun GridScreen(
         onConfirmDelete = editorViewModel::deleteButton,
         onCancelDelete = editorViewModel::hideDeleteConfirmation,
         onDismiss = editorViewModel::dismissDialog
+    )
+
+    // Category edit dialog
+    CategoryEditDialog(
+        state = categoryDialogState,
+        onNameChanged = categoryEditorViewModel::updateName,
+        onSave = categoryEditorViewModel::saveCategory,
+        onToggleVisibility = categoryEditorViewModel::toggleVisibility,
+        onShowDeleteConfirmation = categoryEditorViewModel::showDeleteConfirmation,
+        onConfirmDelete = categoryEditorViewModel::deleteCategory,
+        onCancelDelete = categoryEditorViewModel::hideDeleteConfirmation,
+        onDismiss = categoryEditorViewModel::dismissDialog
     )
 
     Scaffold(
@@ -76,7 +92,7 @@ fun GridScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-            // ── Top Row: Hamburger + Edit Mode Banner / Sentence Bar ──
+            // ── Top Row ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -109,8 +125,8 @@ fun GridScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "✏️ Edit Mode — tap a button to edit",
-                                fontSize = 14.sp,
+                                text = "✏️ Edit Mode — tap buttons or categories to edit",
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color(0xFFE65100)
                             )
@@ -142,11 +158,9 @@ fun GridScreen(
 
             Spacer(modifier = Modifier.height(6.dp))
 
-            // ── Check if profile has any content ──
             val hasContent = uiState.categories.isNotEmpty() || uiState.coreButtons.isNotEmpty()
 
-            if (!hasContent) {
-                // Empty profile state
+            if (!hasContent && !isEditMode) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -193,12 +207,25 @@ fun GridScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // ── Category Tabs ──
-                if (uiState.categories.isNotEmpty()) {
+                // ── Category Tabs (with edit controls in edit mode) ──
+                if (uiState.categories.isNotEmpty() || isEditMode) {
                     CategoryTabs(
                         categories = uiState.categories,
                         selectedCategory = uiState.currentCategory,
+                        isEditMode = isEditMode,
                         onCategorySelected = viewModel::selectCategory,
+                        onCategoryEdit = { category ->
+                            categoryEditorViewModel.showEditDialog(category)
+                        },
+                        onCategoryMoveUp = { category ->
+                            categoryEditorViewModel.moveCategoryUp(category, uiState.categories)
+                        },
+                        onCategoryMoveDown = { category ->
+                            categoryEditorViewModel.moveCategoryDown(category, uiState.categories)
+                        },
+                        onAddCategory = {
+                            categoryEditorViewModel.showAddDialog()
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(6.dp))
