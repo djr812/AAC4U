@@ -14,7 +14,7 @@ coroutines = "1.9.0"
 serialization = "1.7.3"
 core-ktx = "1.15.0"
 activity-compose = "1.9.3"
-sqlcipher = "4.5.4"
+sqlcipher = "4.6.1"
 sqlite = "2.4.0"
 
 # Testing
@@ -57,8 +57,8 @@ room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 
-# SQLCipher (Database Encryption)
-sqlcipher = { group = "net.zetetic", name = "android-database-sqlcipher", version.ref = "sqlcipher" }
+# SQLCipher (Database Encryption - 16KB page size compatible)
+sqlcipher = { group = "net.zetetic", name = "sqlcipher-android", version.ref = "sqlcipher" }
 sqlite-ktx = { group = "androidx.sqlite", name = "sqlite-ktx", version.ref = "sqlite" }
 
 # DataStore (Preferences)

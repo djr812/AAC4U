@@ -11,7 +11,7 @@ import net.djrogers.aac4u.data.local.database.AAC4UDatabase
 import net.djrogers.aac4u.data.local.database.DatabaseKeyManager
 import net.djrogers.aac4u.data.local.database.dao.*
 import net.djrogers.aac4u.data.local.database.migration.Migrations
-import net.sqlcipher.database.SupportFactory
+import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import javax.inject.Singleton
 
 @Module
@@ -24,9 +24,12 @@ object DatabaseModule {
         @ApplicationContext context: Context,
         keyManager: DatabaseKeyManager
     ): AAC4UDatabase {
+        // Load the SQLCipher native library
+        System.loadLibrary("sqlcipher")
+
         // Get the encryption passphrase from the Keystore-backed key manager
         val passphrase = keyManager.getPassphrase()
-        val factory = SupportFactory(passphrase)
+        val factory = SupportOpenHelperFactory(passphrase)
 
         return Room.databaseBuilder(
             context,

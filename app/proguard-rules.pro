@@ -13,10 +13,9 @@
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.AnnotationsKt
 
-# SQLCipher
--keep class net.sqlcipher.** { *; }
--keep class net.sqlcipher.database.** { *; }
--dontwarn net.sqlcipher.**
+# SQLCipher (new sqlcipher-android library)
+-keep class net.zetetic.database.sqlcipher.** { *; }
+-dontwarn net.zetetic.database.sqlcipher.**
 
 # Keep our domain models (used in backup/restore serialization)
 -keep class net.djrogers.aac4u.domain.model.** { *; }
