@@ -133,7 +133,7 @@ fun SettingsScreen(
                 SettingsTab.VOICE -> VoiceSettingsContent(state = state, viewModel = viewModel)
                 SettingsTab.GRID -> StubContent("📐", "Grid Layout", "Column count, button size, label visibility, and grid spacing settings will be available here.")
                 SettingsTab.ACCESSIBILITY -> StubContent("♿", "Accessibility", "High contrast mode, input method selection (tap, dwell, switch, scanning), and timing adjustments will be available here.")
-                SettingsTab.BACKUP -> StubContent("💾", "Backup & Restore", "Export your complete configuration as a backup file, or restore from a previous backup.")
+                SettingsTab.BACKUP -> BackupSettingsContent()
             }
         }
 
@@ -176,23 +176,19 @@ private fun VoiceSettingsContent(
 
     val voiceListItems = remember(state.offlineVoices, state.onlineOnlyVoices) {
         val list = mutableListOf<VoiceListItem>()
-
         list.add(VoiceListItem.DefaultEntry)
-
         if (state.offlineVoices.isNotEmpty()) {
             list.add(VoiceListItem.Header("Offline (${state.offlineVoices.size})", Color(0xFF43A047)))
             state.offlineVoices.forEach { voice ->
                 list.add(VoiceListItem.VoiceEntry(voice.name, voice.displayName, true))
             }
         }
-
         if (state.onlineOnlyVoices.isNotEmpty()) {
             list.add(VoiceListItem.Header("Online Only (${state.onlineOnlyVoices.size})", Color(0xFFFF8F00)))
             state.onlineOnlyVoices.forEach { voice ->
                 list.add(VoiceListItem.VoiceEntry(voice.name, voice.displayName, false))
             }
         }
-
         list.toList()
     }
 
@@ -202,7 +198,6 @@ private fun VoiceSettingsContent(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // ── LEFT: Voice List ──
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
@@ -238,14 +233,12 @@ private fun VoiceSettingsContent(
             }
         }
 
-        // ── RIGHT: Controls ──
         Column(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ── Sliders Section ──
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
@@ -254,18 +247,14 @@ private fun VoiceSettingsContent(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     SliderSetting(
-                        label = "Speed",
-                        value = state.previewRate,
+                        label = "Speed", value = state.previewRate,
                         valueLabel = "${state.previewRate}x",
                         min = 0.5f, max = 2.0f, steps = 15,
                         onValueChange = viewModel::setPreviewRate
                     )
-
                     Spacer(modifier = Modifier.height(8.dp))
-
                     SliderSetting(
-                        label = "Pitch",
-                        value = state.previewPitch,
+                        label = "Pitch", value = state.previewPitch,
                         valueLabel = "${state.previewPitch}x",
                         min = 0.5f, max = 2.0f, steps = 15,
                         onValueChange = viewModel::setPreviewPitch
@@ -273,7 +262,6 @@ private fun VoiceSettingsContent(
                 }
             }
 
-            // ── Test / Save / Discard Section ──
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
@@ -281,12 +269,9 @@ private fun VoiceSettingsContent(
                 shadowElevation = 1.dp
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    // Test button
                     OutlinedButton(
                         onClick = if (state.isSpeaking) viewModel::stopTest else viewModel::testVoice,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
@@ -294,10 +279,7 @@ private fun VoiceSettingsContent(
                             fontSize = 15.sp
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Save / Discard row
+                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -305,23 +287,16 @@ private fun VoiceSettingsContent(
                         if (state.hasUnsavedChanges) {
                             OutlinedButton(
                                 onClick = viewModel::discardChanges,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(44.dp),
+                                modifier = Modifier.weight(1f).height(44.dp),
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = Color(0xFFEF5350)
-                                )
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFEF5350))
                             ) {
                                 Text("Discard", fontSize = 14.sp)
                             }
                         }
-
                         Button(
                             onClick = viewModel::saveSettings,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp),
+                            modifier = Modifier.weight(1f).height(44.dp),
                             enabled = state.hasUnsavedChanges,
                             shape = RoundedCornerShape(8.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -341,9 +316,7 @@ private fun VoiceSettingsContent(
 @Composable
 private fun StubContent(emoji: String, title: String, description: String) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
+        modifier = Modifier.fillMaxSize().padding(32.dp),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -363,11 +336,7 @@ private fun StubContent(emoji: String, title: String, description: String) {
 
 @Composable
 private fun VoiceRow(
-    label: String,
-    isOffline: Boolean,
-    isSelected: Boolean,
-    showBadge: Boolean,
-    onClick: () -> Unit
+    label: String, isOffline: Boolean, isSelected: Boolean, showBadge: Boolean, onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -384,43 +353,28 @@ private fun VoiceRow(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier
-                .size(18.dp)
-                .clip(CircleShape)
+            modifier = Modifier.size(18.dp).clip(CircleShape)
                 .background(if (isSelected) Color(0xFF42A5F5) else Color(0xFFE0E0E0)),
             contentAlignment = Alignment.Center
         ) {
             if (isSelected) {
-                Box(
-                    modifier = Modifier
-                        .size(7.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                )
+                Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(Color.White))
             }
         }
-
         Spacer(modifier = Modifier.width(10.dp))
-
         Text(
-            text = label,
-            fontSize = 14.sp,
+            text = label, fontSize = 14.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = Color(0xFF2E7D32),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            color = Color(0xFF2E7D32), maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-
         if (showBadge) {
             Spacer(modifier = Modifier.width(6.dp))
             Text(
-                text = if (isOffline) "offline" else "online",
-                fontSize = 10.sp,
+                text = if (isOffline) "offline" else "online", fontSize = 10.sp,
                 fontWeight = FontWeight.Medium,
                 color = if (isOffline) Color(0xFF43A047) else Color(0xFFFF8F00),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
+                modifier = Modifier.clip(RoundedCornerShape(4.dp))
                     .background(if (isOffline) Color(0xFFE8F5E9) else Color(0xFFFFF3E0))
                     .padding(horizontal = 5.dp, vertical = 2.dp)
             )
