@@ -9,6 +9,7 @@ import net.djrogers.aac4u.domain.model.AACButton
  */
 interface ButtonRepository {
     fun getButtonsByCategory(categoryId: Long): Flow<List<AACButton>>
+    fun getButtonsByProfile(profileId: Long): Flow<List<AACButton>>
     fun getQuickPhraseButtons(profileId: Long): Flow<List<AACButton>>
     suspend fun getButtonById(id: Long): AACButton?
     suspend fun insertButton(button: AACButton): Long

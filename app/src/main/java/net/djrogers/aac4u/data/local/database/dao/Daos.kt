@@ -15,6 +15,14 @@ interface ButtonDao {
     @Query("""
         SELECT b.* FROM buttons b 
         INNER JOIN categories c ON b.categoryId = c.id 
+        WHERE c.profileId = :profileId AND b.isVisible = 1 
+        ORDER BY b.usageCount DESC
+    """)
+    fun getButtonsByProfile(profileId: Long): Flow<List<ButtonEntity>>
+
+    @Query("""
+        SELECT b.* FROM buttons b 
+        INNER JOIN categories c ON b.categoryId = c.id 
         WHERE c.profileId = :profileId AND b.isQuickPhrase = 1 AND b.isVisible = 1 
         ORDER BY b.usageCount DESC
     """)

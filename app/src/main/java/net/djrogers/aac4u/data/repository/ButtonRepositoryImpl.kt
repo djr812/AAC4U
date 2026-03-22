@@ -21,6 +21,12 @@ class ButtonRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun getButtonsByProfile(profileId: Long): Flow<List<AACButton>> {
+        return buttonDao.getButtonsByProfile(profileId).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
     override fun getQuickPhraseButtons(profileId: Long): Flow<List<AACButton>> {
         return buttonDao.getQuickPhraseButtons(profileId).map { entities ->
             entities.map { it.toDomain() }

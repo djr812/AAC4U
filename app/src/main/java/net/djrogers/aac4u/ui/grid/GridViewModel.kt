@@ -54,7 +54,6 @@ class GridViewModel @Inject constructor(
                     val profileChanged = activeProfileId != null && activeProfileId != profile.id
                     activeProfileId = profile.id
 
-                    // Apply TTS settings without blocking UI
                     launch { tts.applyProfile(profile.ttsVoiceName, profile.ttsRate, profile.ttsPitch) }
 
                     if (profileChanged) {
@@ -68,7 +67,6 @@ class GridViewModel @Inject constructor(
                         )
                     }
 
-                    // Load categories and core buttons in parallel
                     loadCategories(profile.id)
                     loadCoreButtons(profile.id)
                 } else {
@@ -157,7 +155,6 @@ class GridViewModel @Inject constructor(
     }
 
     fun selectCategory(category: Category) {
-        // Update immediately for snappy tab switching
         _uiState.update { it.copy(currentCategory = category, buttons = emptyList()) }
 
         buttonsJob?.cancel()
@@ -171,16 +168,42 @@ class GridViewModel @Inject constructor(
     }
 
     fun onButtonTapped(button: AACButton) {
-        // Update sentence immediately (no suspend needed)
+        // Update sentence immediately
         val updatedParts = buildSentenceUseCase.addPart(button.phrase)
         _uiState.update { state ->
             state.copy(
                 sentenceParts = updatedParts,
-                lastTappedButtonId = button.id
+                lastTappedButtonId = button.id,
+                predictedButtons = emptyList() // Clear old predictions instantly
             )
         }
 
-        // Background: record usage and update predictions
+        // Background: record usage and get new predictions
+        viewModelScope.launch {
+            val profileId = activeProfileId ?: return@launch
+            selectButtonUseCase(
+                button = button,
+                previousButtonId = _uiState.value.lastTappedButtonId,
+                profileId = profileId
+            )
+            updatePredictions(profileId, button.id)
+        }
+    }
+
+    /**
+     * Called when the user taps an inline prediction in the sentence bar.
+     * Adds the predicted word to the sentence and generates new predictions.
+     */
+    fun onPredictionAccepted(button: AACButton) {
+        val updatedParts = buildSentenceUseCase.addPart(button.phrase)
+        _uiState.update { state ->
+            state.copy(
+                sentenceParts = updatedParts,
+                lastTappedButtonId = button.id,
+                predictedButtons = emptyList()
+            )
+        }
+
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
             selectButtonUseCase(
@@ -196,10 +219,8 @@ class GridViewModel @Inject constructor(
         val sentence = _uiState.value.fullSentence
         if (sentence.isBlank()) return
 
-        // Speak immediately
         tts.speakPhrase(sentence)
 
-        // Record in background
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
             speakPhraseUseCase(sentence, profileId)
@@ -225,14 +246,18 @@ class GridViewModel @Inject constructor(
     fun removeLastPart() {
         val updatedParts = buildSentenceUseCase.removeLastPart()
         _uiState.update { state ->
-            state.copy(sentenceParts = updatedParts)
+            state.copy(sentenceParts = updatedParts, predictedButtons = emptyList())
         }
     }
 
     fun clearSentence() {
         val updatedParts = buildSentenceUseCase.clear()
         _uiState.update { state ->
-            state.copy(sentenceParts = updatedParts, lastTappedButtonId = null)
+            state.copy(
+                sentenceParts = updatedParts,
+                lastTappedButtonId = null,
+                predictedButtons = emptyList()
+            )
         }
     }
 

@@ -1,6 +1,5 @@
 package net.djrogers.aac4u.ui.grid
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,13 +41,6 @@ fun GridScreen(
     val categoryDialogState by categoryEditorViewModel.dialogState.collectAsStateWithLifecycle()
 
     var isCoreExpanded by remember { mutableStateOf(false) }
-
-    // Collapse core panel when exiting edit mode
-    LaunchedEffect(isEditMode) {
-        if (!isEditMode) {
-            // Keep expanded state — user controls it
-        }
-    }
 
     // Button edit dialog
     ButtonEditDialog(
@@ -155,11 +147,15 @@ fun GridScreen(
                 } else {
                     SentenceBar(
                         sentenceParts = uiState.sentenceParts,
+                        predictedWords = uiState.predictedButtons,
                         isSpeaking = uiState.isSpeaking,
                         onSpeak = viewModel::speakSentence,
                         onBackspace = viewModel::removeLastPart,
                         onClear = viewModel::clearSentence,
                         onStop = viewModel::stopSpeaking,
+                        onPredictionTapped = { button ->
+                            viewModel.onPredictionAccepted(button)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -268,17 +264,7 @@ fun GridScreen(
                     }
                 }
 
-                // ── Prediction Row ──
-                if (!isEditMode && uiState.predictedButtons.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    // Keep using CoreBar for predictions (compact row)
-                    net.djrogers.aac4u.ui.grid.components.CoreBar(
-                        buttons = uiState.predictedButtons,
-                        onButtonTapped = viewModel::onButtonTapped,
-                        isCore = false,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                // Prediction row REMOVED — predictions now show inline in the sentence bar
             }
         }
     }
