@@ -29,20 +29,21 @@ class AAC4UApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // Seed database — this must complete before UI loads
         applicationScope.launch {
-            // Seed database with default data on first launch
             databaseSeeder.seedIfEmpty()
+        }
 
-            // Wait for TTS to be ready, then apply the saved profile voice settings
-            tts.isReady.first { it }
-
-            val profile = profileRepository.getActiveProfile().first()
-            if (profile != null) {
-                tts.applyProfile(
-                    profile.ttsVoiceName,
-                    profile.ttsRate,
-                    profile.ttsPitch
-                )
+        // Apply TTS profile in background — don't block startup
+        applicationScope.launch {
+            try {
+                tts.isReady.first { it }
+                val profile = profileRepository.getActiveProfile().first()
+                if (profile != null) {
+                    tts.applyProfile(profile.ttsVoiceName, profile.ttsRate, profile.ttsPitch)
+                }
+            } catch (_: Exception) {
+                // TTS not available — continue without it
             }
         }
     }

@@ -61,18 +61,21 @@ fun AACButton(
         label = "buttonScale"
     )
 
-    val resolvedBgColor = if (button.backgroundColor != null) {
-        try {
-            Color(android.graphics.Color.parseColor(button.backgroundColor))
-        } catch (e: Exception) {
+    // Cache resolved colours to avoid recalculation during recomposition
+    val resolvedBgColor = remember(button.backgroundColor, categoryColor) {
+        if (button.backgroundColor != null) {
+            try {
+                Color(android.graphics.Color.parseColor(button.backgroundColor))
+            } catch (e: Exception) {
+                categoryColor
+            }
+        } else {
             categoryColor
         }
-    } else {
-        categoryColor
     }
 
+    val textColor = remember(resolvedBgColor) { AACColors.textOn(resolvedBgColor) }
     val displayColor = if (isPressed) AACColors.pressed(resolvedBgColor) else resolvedBgColor
-    val textColor = AACColors.textOn(resolvedBgColor)
     val borderColor = if (isEditMode) Color(0xFFFF8F00) else Color(0x15000000)
     val borderWidth = if (isEditMode) 2.dp else 1.dp
 
@@ -111,17 +114,16 @@ fun AACButton(
         contentAlignment = Alignment.Center
     ) {
         if (hasImage) {
-            // ── Image + Label layout ──
             Column(
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Symbol image
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(button.imagePath)
-                        .crossfade(true)
+                        .crossfade(false) // Disable crossfade for snappier loading
+                        .memoryCacheKey(button.imagePath) // Explicit cache key
                         .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
@@ -131,7 +133,6 @@ fun AACButton(
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 )
 
-                // Label below image
                 if (showLabel) {
                     Text(
                         text = button.label,
@@ -149,7 +150,6 @@ fun AACButton(
                 }
             }
         } else {
-            // ── Text-only layout ──
             Text(
                 text = button.label,
                 color = textColor,
@@ -165,7 +165,6 @@ fun AACButton(
             )
         }
 
-        // Edit mode indicator
         if (isEditMode) {
             Box(
                 modifier = Modifier

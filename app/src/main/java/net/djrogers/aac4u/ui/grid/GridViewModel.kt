@@ -54,9 +54,9 @@ class GridViewModel @Inject constructor(
                     val profileChanged = activeProfileId != null && activeProfileId != profile.id
                     activeProfileId = profile.id
 
-                    tts.applyProfile(profile.ttsVoiceName, profile.ttsRate, profile.ttsPitch)
+                    // Apply TTS settings without blocking UI
+                    launch { tts.applyProfile(profile.ttsVoiceName, profile.ttsRate, profile.ttsPitch) }
 
-                    // If profile changed, fully reset the grid
                     if (profileChanged) {
                         resetGridState()
                     }
@@ -68,6 +68,7 @@ class GridViewModel @Inject constructor(
                         )
                     }
 
+                    // Load categories and core buttons in parallel
                     loadCategories(profile.id)
                     loadCoreButtons(profile.id)
                 } else {
@@ -77,10 +78,6 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Fully reset the grid when switching profiles.
-     * Cancels all active jobs, clears state, clears sentence builder.
-     */
     private fun resetGridState() {
         buttonsJob?.cancel()
         coreButtonsJob?.cancel()
@@ -110,8 +107,6 @@ class GridViewModel @Inject constructor(
                     )
                 }
 
-                // Auto-select first category if none selected or previous selection
-                // doesn't belong to this profile
                 val currentCategory = _uiState.value.currentCategory
                 val shouldReselect = currentCategory == null ||
                         fringeCategories.none { it.id == currentCategory.id }
@@ -119,13 +114,9 @@ class GridViewModel @Inject constructor(
                 if (shouldReselect && fringeCategories.isNotEmpty()) {
                     selectCategory(fringeCategories.first())
                 } else if (shouldReselect && fringeCategories.isEmpty()) {
-                    // Empty profile — clear buttons
                     buttonsJob?.cancel()
                     _uiState.update { state ->
-                        state.copy(
-                            currentCategory = null,
-                            buttons = emptyList()
-                        )
+                        state.copy(currentCategory = null, buttons = emptyList())
                     }
                 }
             }
@@ -144,7 +135,6 @@ class GridViewModel @Inject constructor(
                         }
                     }
                 } else {
-                    // No core category for this profile
                     _uiState.update { state ->
                         state.copy(coreButtons = emptyList())
                     }
@@ -166,10 +156,9 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    // ── User Actions ──
-
     fun selectCategory(category: Category) {
-        _uiState.update { it.copy(currentCategory = category) }
+        // Update immediately for snappy tab switching
+        _uiState.update { it.copy(currentCategory = category, buttons = emptyList()) }
 
         buttonsJob?.cancel()
         buttonsJob = viewModelScope.launch {
@@ -182,24 +171,23 @@ class GridViewModel @Inject constructor(
     }
 
     fun onButtonTapped(button: AACButton) {
+        // Update sentence immediately (no suspend needed)
+        val updatedParts = buildSentenceUseCase.addPart(button.phrase)
+        _uiState.update { state ->
+            state.copy(
+                sentenceParts = updatedParts,
+                lastTappedButtonId = button.id
+            )
+        }
+
+        // Background: record usage and update predictions
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
-
             selectButtonUseCase(
                 button = button,
                 previousButtonId = _uiState.value.lastTappedButtonId,
                 profileId = profileId
             )
-
-            val updatedParts = buildSentenceUseCase.addPart(button.phrase)
-
-            _uiState.update { state ->
-                state.copy(
-                    sentenceParts = updatedParts,
-                    lastTappedButtonId = button.id
-                )
-            }
-
             updatePredictions(profileId, button.id)
         }
     }
@@ -208,8 +196,10 @@ class GridViewModel @Inject constructor(
         val sentence = _uiState.value.fullSentence
         if (sentence.isBlank()) return
 
+        // Speak immediately
         tts.speakPhrase(sentence)
 
+        // Record in background
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
             speakPhraseUseCase(sentence, profileId)
@@ -227,7 +217,6 @@ class GridViewModel @Inject constructor(
                 previousButtonId = _uiState.value.lastTappedButtonId,
                 profileId = profileId
             )
-
             _uiState.update { it.copy(lastTappedButtonId = button.id) }
             updatePredictions(profileId, button.id)
         }
@@ -243,10 +232,7 @@ class GridViewModel @Inject constructor(
     fun clearSentence() {
         val updatedParts = buildSentenceUseCase.clear()
         _uiState.update { state ->
-            state.copy(
-                sentenceParts = updatedParts,
-                lastTappedButtonId = null
-            )
+            state.copy(sentenceParts = updatedParts, lastTappedButtonId = null)
         }
     }
 

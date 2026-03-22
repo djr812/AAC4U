@@ -30,7 +30,8 @@ fun AACButtonGrid(
     ) {
         items(
             items = buttons,
-            key = { it.id }
+            key = { it.id },
+            contentType = { "aac_button" } // Helps Compose reuse compositions
         ) { button ->
             AACButton(
                 button = button,
