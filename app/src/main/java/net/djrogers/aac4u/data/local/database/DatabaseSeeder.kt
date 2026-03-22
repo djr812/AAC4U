@@ -5,12 +5,6 @@ import net.djrogers.aac4u.data.symbol.SymbolManager
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Seeds the database with a default profile, core vocabulary, and starter
- * fringe categories on first launch.
- *
- * Now auto-assigns ARASAAC symbol images to buttons using the symbol mapping.
- */
 @Singleton
 class DatabaseSeeder @Inject constructor(
     private val database: AAC4UDatabase,
@@ -27,56 +21,58 @@ class DatabaseSeeder @Inject constructor(
         val profileId = profileDao.insertProfile(
             ProfileEntity(
                 name = "Default",
-                gridColumns = 4,
-                gridRows = 4,
-                buttonPaddingDp = 4,
-                showLabels = true,
-                labelPosition = "BELOW",
-                inputMethod = "TAP",
-                feedbackMode = "BOTH",
-                ttsRate = 1.0f,
-                ttsPitch = 1.0f,
-                isActive = true,
-                highContrastEnabled = false,
-                dwellTimeMs = 1500,
-                scanSpeedMs = 2000
+                gridColumns = 4, gridRows = 4, buttonPaddingDp = 4,
+                showLabels = true, labelPosition = "BELOW",
+                inputMethod = "TAP", feedbackMode = "BOTH",
+                ttsRate = 1.0f, ttsPitch = 1.0f,
+                isActive = true, highContrastEnabled = false,
+                dwellTimeMs = 1500, scanSpeedMs = 2000
             )
         )
 
-        // ── CORE VOCABULARY ──
+        // ── CORE VOCABULARY (100+ high-frequency words) ──
         val coreId = categoryDao.insertCategory(
             CategoryEntity(
-                profileId = profileId,
-                name = "Core",
-                sortOrder = 0,
-                isVisible = true,
-                vocabularyType = "CORE"
+                profileId = profileId, name = "Core", sortOrder = 0,
+                isVisible = true, vocabularyType = "CORE"
             )
         )
 
+        // All core words in a meaningful order matching the grouped display
         val coreWords = listOf(
-            "I", "you", "he", "she", "it", "we", "they",
-            "want", "go", "like", "need", "help",
-            "have", "make", "do", "get", "see",
-            "more", "not", "all", "some",
-            "yes", "no", "please", "thank you",
-            "hello", "goodbye",
-            "and", "the", "is", "my", "that",
-            "what", "where", "who", "when", "why", "how"
+            // Pronouns
+            "I", "me", "my", "mine", "you", "it", "he", "she", "we", "they",
+            // Verbs (action words)
+            "go", "stop", "turn", "make", "look", "see", "find", "put",
+            "open", "close", "eat", "drink", "get", "help", "want", "need",
+            "say", "tell", "come", "read", "like", "feel", "color", "let's",
+            "work", "play", "finished",
+            // Adjectives (descriptive words)
+            "more", "one", "big", "little", "fast", "slow", "same", "different",
+            "pretty", "red", "blue", "yellow", "good", "bad", "new", "old", "happy", "sad",
+            // Preverbs (helping words)
+            "be", "is", "am", "are", "was", "were", "do", "did", "can", "have", "will",
+            // Prepositions (placing words)
+            "on", "off", "in", "out", "up", "down", "to", "for", "under", "with",
+            // Question words
+            "what", "when", "where", "who", "why", "how",
+            // Interjections (social words)
+            "yes", "no", "thank you", "please", "hello", "goodbye",
+            // Determiners (pointer words)
+            "this", "that", "some", "all", "the",
+            // Adverbs
+            "not", "now", "here", "there", "away", "again",
+            // Conjunctions
+            "and", "but"
         )
 
         coreWords.forEachIndexed { index, word ->
             val symbolPath = symbolManager.getSymbolForWord(word)
             buttonDao.insertButton(
                 ButtonEntity(
-                    categoryId = coreId,
-                    label = word,
-                    phrase = word,
-                    imagePath = symbolPath,
-                    imageType = if (symbolPath != null) "BUNDLED" else "BUNDLED",
-                    sortOrder = index,
-                    isVisible = true,
-                    isQuickPhrase = false
+                    categoryId = coreId, label = word, phrase = word,
+                    imagePath = symbolPath, imageType = "BUNDLED",
+                    sortOrder = index, isVisible = true, isQuickPhrase = false
                 )
             )
         }
@@ -190,14 +186,9 @@ class DatabaseSeeder @Inject constructor(
             val symbolPath = symbolManager.getSymbolForWord(phrase)
             buttonDao.insertButton(
                 ButtonEntity(
-                    categoryId = quickId,
-                    label = phrase,
-                    phrase = phrase,
-                    imagePath = symbolPath,
-                    imageType = if (symbolPath != null) "BUNDLED" else "BUNDLED",
-                    sortOrder = index,
-                    isVisible = true,
-                    isQuickPhrase = true
+                    categoryId = quickId, label = phrase, phrase = phrase,
+                    imagePath = symbolPath, imageType = "BUNDLED",
+                    sortOrder = index, isVisible = true, isQuickPhrase = true
                 )
             )
         }
@@ -212,14 +203,9 @@ class DatabaseSeeder @Inject constructor(
             val symbolPath = symbolManager.getSymbolForWord(word)
             buttonDao.insertButton(
                 ButtonEntity(
-                    categoryId = categoryId,
-                    label = word,
-                    phrase = word,
-                    imagePath = symbolPath,
-                    imageType = if (symbolPath != null) "BUNDLED" else "BUNDLED",
-                    sortOrder = index,
-                    isVisible = true,
-                    isQuickPhrase = false
+                    categoryId = categoryId, label = word, phrase = word,
+                    imagePath = symbolPath, imageType = "BUNDLED",
+                    sortOrder = index, isVisible = true, isQuickPhrase = false
                 )
             )
         }

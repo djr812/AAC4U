@@ -1,12 +1,12 @@
 package net.djrogers.aac4u.ui.grid
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,7 +23,7 @@ import net.djrogers.aac4u.ui.editor.CategoryEditorViewModel
 import net.djrogers.aac4u.ui.editor.EditorViewModel
 import net.djrogers.aac4u.ui.grid.components.AACButtonGrid
 import net.djrogers.aac4u.ui.grid.components.CategoryTabs
-import net.djrogers.aac4u.ui.grid.components.CoreBar
+import net.djrogers.aac4u.ui.grid.components.ExpandableCorePanel
 import net.djrogers.aac4u.ui.grid.components.SentenceBar
 import net.djrogers.aac4u.ui.theme.AACColors
 
@@ -40,6 +40,15 @@ fun GridScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val editState by editorViewModel.editState.collectAsStateWithLifecycle()
     val categoryDialogState by categoryEditorViewModel.dialogState.collectAsStateWithLifecycle()
+
+    var isCoreExpanded by remember { mutableStateOf(false) }
+
+    // Collapse core panel when exiting edit mode
+    LaunchedEffect(isEditMode) {
+        if (!isEditMode) {
+            // Keep expanded state — user controls it
+        }
+    }
 
     // Button edit dialog
     ButtonEditDialog(
@@ -190,42 +199,35 @@ fun GridScreen(
                     }
                 }
             } else {
-                // ── Core Vocabulary Bar ──
+                // ── Expandable Core Panel ──
                 if (uiState.coreButtons.isNotEmpty()) {
-                    CoreBar(
-                        buttons = uiState.coreButtons,
+                    ExpandableCorePanel(
+                        coreButtons = uiState.coreButtons,
+                        isEditMode = isEditMode,
+                        isExpanded = isCoreExpanded,
+                        onToggleExpand = { isCoreExpanded = !isCoreExpanded },
                         onButtonTapped = { button ->
-                            if (isEditMode) {
-                                editorViewModel.editButton(button)
-                            } else {
-                                viewModel.onButtonTapped(button)
-                            }
+                            viewModel.onButtonTapped(button)
                         },
-                        isCore = true,
+                        onButtonEdit = { button ->
+                            editorViewModel.editButton(button)
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // ── Category Tabs (with edit controls in edit mode) ──
+                // ── Category Tabs ──
                 if (uiState.categories.isNotEmpty() || isEditMode) {
                     CategoryTabs(
                         categories = uiState.categories,
                         selectedCategory = uiState.currentCategory,
                         isEditMode = isEditMode,
                         onCategorySelected = viewModel::selectCategory,
-                        onCategoryEdit = { category ->
-                            categoryEditorViewModel.showEditDialog(category)
-                        },
-                        onCategoryMoveUp = { category ->
-                            categoryEditorViewModel.moveCategoryUp(category, uiState.categories)
-                        },
-                        onCategoryMoveDown = { category ->
-                            categoryEditorViewModel.moveCategoryDown(category, uiState.categories)
-                        },
-                        onAddCategory = {
-                            categoryEditorViewModel.showAddDialog()
-                        },
+                        onCategoryEdit = { categoryEditorViewModel.showEditDialog(it) },
+                        onCategoryMoveUp = { categoryEditorViewModel.moveCategoryUp(it, uiState.categories) },
+                        onCategoryMoveDown = { categoryEditorViewModel.moveCategoryDown(it, uiState.categories) },
+                        onAddCategory = { categoryEditorViewModel.showAddDialog() },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -239,48 +241,38 @@ fun GridScreen(
                     isEditMode = isEditMode,
                     categoryColor = currentCategoryColor,
                     onButtonTapped = { button ->
-                        if (isEditMode) {
-                            editorViewModel.editButton(button)
-                        } else {
-                            viewModel.onButtonTapped(button)
-                        }
+                        if (isEditMode) editorViewModel.editButton(button)
+                        else viewModel.onButtonTapped(button)
                     },
                     onButtonLongPressed = { button ->
-                        if (!isEditMode) {
-                            editorViewModel.editButton(button)
-                        }
+                        if (!isEditMode) editorViewModel.editButton(button)
                     },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                 )
 
-                // ── Add Button (edit mode only) ──
+                // ── Add Button (edit mode) ──
                 if (isEditMode && uiState.currentCategory != null) {
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedButton(
                         onClick = {
-                            uiState.currentCategory?.let { category ->
-                                editorViewModel.addNewButton(category.id)
-                            }
+                            uiState.currentCategory?.let { editorViewModel.addNewButton(it.id) }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(44.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text(
-                            text = "＋ Add New Button",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Text("＋ Add New Button", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
-                // ── Prediction Row (hidden in edit mode) ──
+                // ── Prediction Row ──
                 if (!isEditMode && uiState.predictedButtons.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(6.dp))
-                    CoreBar(
+                    // Keep using CoreBar for predictions (compact row)
+                    net.djrogers.aac4u.ui.grid.components.CoreBar(
                         buttons = uiState.predictedButtons,
                         onButtonTapped = viewModel::onButtonTapped,
                         isCore = false,
