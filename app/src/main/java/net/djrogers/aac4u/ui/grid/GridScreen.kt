@@ -42,7 +42,6 @@ fun GridScreen(
 
     var isCoreExpanded by remember { mutableStateOf(false) }
 
-    // Button edit dialog
     ButtonEditDialog(
         state = editState,
         onLabelChanged = editorViewModel::updateLabel,
@@ -56,7 +55,6 @@ fun GridScreen(
         onDismiss = editorViewModel::dismissDialog
     )
 
-    // Category edit dialog
     CategoryEditDialog(
         state = categoryDialogState,
         onNameChanged = categoryEditorViewModel::updateName,
@@ -93,7 +91,6 @@ fun GridScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-            // ── Top Row ──
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -156,6 +153,9 @@ fun GridScreen(
                         onPredictionTapped = { button ->
                             viewModel.onPredictionAccepted(button)
                         },
+                        onSuffixApplied = { suffixType ->
+                            viewModel.applySuffix(suffixType)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -195,7 +195,6 @@ fun GridScreen(
                     }
                 }
             } else {
-                // ── Expandable Core Panel ──
                 if (uiState.coreButtons.isNotEmpty()) {
                     ExpandableCorePanel(
                         coreButtons = uiState.coreButtons,
@@ -214,7 +213,6 @@ fun GridScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // ── Category Tabs ──
                 if (uiState.categories.isNotEmpty() || isEditMode) {
                     CategoryTabs(
                         categories = uiState.categories,
@@ -230,7 +228,6 @@ fun GridScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                 }
 
-                // ── Main Button Grid ──
                 AACButtonGrid(
                     buttons = uiState.buttons,
                     columns = uiState.gridColumns,
@@ -249,7 +246,6 @@ fun GridScreen(
                         .weight(1f)
                 )
 
-                // ── Add Button (edit mode) ──
                 if (isEditMode && uiState.currentCategory != null) {
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedButton(

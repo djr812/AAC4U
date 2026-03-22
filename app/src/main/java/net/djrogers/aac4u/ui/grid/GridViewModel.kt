@@ -14,6 +14,7 @@ import net.djrogers.aac4u.domain.repository.ButtonRepository
 import net.djrogers.aac4u.domain.repository.CategoryRepository
 import net.djrogers.aac4u.domain.repository.ProfileRepository
 import net.djrogers.aac4u.domain.usecase.grid.BuildSentenceUseCase
+import net.djrogers.aac4u.domain.usecase.grid.EnglishSuffixEngine
 import net.djrogers.aac4u.domain.usecase.grid.SelectButtonUseCase
 import net.djrogers.aac4u.domain.usecase.prediction.GetPredictedButtonsUseCase
 import net.djrogers.aac4u.domain.usecase.tts.SpeakPhraseUseCase
@@ -168,17 +169,15 @@ class GridViewModel @Inject constructor(
     }
 
     fun onButtonTapped(button: AACButton) {
-        // Update sentence immediately
         val updatedParts = buildSentenceUseCase.addPart(button.phrase)
         _uiState.update { state ->
             state.copy(
                 sentenceParts = updatedParts,
                 lastTappedButtonId = button.id,
-                predictedButtons = emptyList() // Clear old predictions instantly
+                predictedButtons = emptyList()
             )
         }
 
-        // Background: record usage and get new predictions
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
             selectButtonUseCase(
@@ -190,10 +189,6 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Called when the user taps an inline prediction in the sentence bar.
-     * Adds the predicted word to the sentence and generates new predictions.
-     */
     fun onPredictionAccepted(button: AACButton) {
         val updatedParts = buildSentenceUseCase.addPart(button.phrase)
         _uiState.update { state ->
@@ -212,6 +207,33 @@ class GridViewModel @Inject constructor(
                 profileId = profileId
             )
             updatePredictions(profileId, button.id)
+        }
+    }
+
+    /**
+     * Apply a suffix to the last word in the sentence.
+     * Uses the EnglishSuffixEngine for proper morphology.
+     */
+    fun applySuffix(suffixType: String) {
+        val currentParts = _uiState.value.sentenceParts
+        if (currentParts.isEmpty()) return
+
+        val lastWord = currentParts.last()
+        val modifiedWord = when (suffixType) {
+            "s" -> EnglishSuffixEngine.addPlural(lastWord)
+            "ed" -> EnglishSuffixEngine.addPastTense(lastWord)
+            "ing" -> EnglishSuffixEngine.addPresentParticiple(lastWord)
+            "er" -> EnglishSuffixEngine.addComparative(lastWord)
+            "est" -> EnglishSuffixEngine.addSuperlative(lastWord)
+            "nt" -> EnglishSuffixEngine.addNegation(lastWord)
+            else -> lastWord
+        }
+
+        if (modifiedWord != lastWord) {
+            val updatedParts = buildSentenceUseCase.replaceLastPart(modifiedWord)
+            _uiState.update { state ->
+                state.copy(sentenceParts = updatedParts)
+            }
         }
     }
 

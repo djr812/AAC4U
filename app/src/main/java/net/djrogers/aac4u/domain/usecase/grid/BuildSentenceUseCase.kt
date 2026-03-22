@@ -31,6 +31,13 @@ class BuildSentenceUseCase @Inject constructor() {
         return parts.toList()
     }
 
+    fun replaceLastPart(newPart: String): List<String> {
+        if (parts.isNotEmpty()) {
+            parts[parts.size - 1] = newPart
+        }
+        return parts.toList()
+    }
+
     /**
      * Get the full sentence as a single string for TTS.
      */
