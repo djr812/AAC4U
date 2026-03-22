@@ -27,15 +27,11 @@ data class BackupUiState(
     val exportSuccess: Boolean = false,
     val importSuccess: Boolean = false,
     val error: String? = null,
-
-    // Export dialog
     val showExportDialog: Boolean = false,
     val exportPassword: String = "",
     val exportConfirmPassword: String = "",
     val exportType: String = "all",
     val selectedProfileId: Long? = null,
-
-    // Import dialog
     val showImportDialog: Boolean = false,
     val importPassword: String = "",
     val importUri: Uri? = null,
@@ -44,8 +40,6 @@ data class BackupUiState(
     val selectedImportProfile: ProfileBackup? = null,
     val importMode: String = "new",
     val replaceProfileId: Long? = null,
-
-    // Available profiles for replace target
     val profiles: List<UserProfile> = emptyList()
 )
 
@@ -59,9 +53,7 @@ class BackupViewModel @Inject constructor(
     private val _state = MutableStateFlow(BackupUiState())
     val state: StateFlow<BackupUiState> = _state.asStateFlow()
 
-    init {
-        loadProfiles()
-    }
+    init { loadProfiles() }
 
     private fun loadProfiles() {
         viewModelScope.launch {
@@ -72,236 +64,106 @@ class BackupViewModel @Inject constructor(
         }
     }
 
-    // ── Export ──
-
     fun showExportAllDialog() {
-        _state.update {
-            it.copy(
-                showExportDialog = true,
-                exportType = "all",
-                exportPassword = "",
-                exportConfirmPassword = "",
-                error = null,
-                exportSuccess = false
-            )
-        }
+        _state.update { it.copy(showExportDialog = true, exportType = "all", exportPassword = "", exportConfirmPassword = "", error = null, exportSuccess = false) }
     }
 
     fun showExportProfileDialog(profileId: Long) {
-        _state.update {
-            it.copy(
-                showExportDialog = true,
-                exportType = "single",
-                selectedProfileId = profileId,
-                exportPassword = "",
-                exportConfirmPassword = "",
-                error = null,
-                exportSuccess = false
-            )
-        }
+        _state.update { it.copy(showExportDialog = true, exportType = "single", selectedProfileId = profileId, exportPassword = "", exportConfirmPassword = "", error = null, exportSuccess = false) }
     }
 
-    fun updateExportPassword(password: String) {
-        _state.update { it.copy(exportPassword = password, error = null) }
-    }
-
-    fun updateExportConfirmPassword(password: String) {
-        _state.update { it.copy(exportConfirmPassword = password, error = null) }
-    }
+    fun updateExportPassword(password: String) { _state.update { it.copy(exportPassword = password, error = null) } }
+    fun updateExportConfirmPassword(password: String) { _state.update { it.copy(exportConfirmPassword = password, error = null) } }
 
     fun executeExport() {
-        val currentState = _state.value
-
-        if (currentState.exportPassword.length < 4) {
-            _state.update { it.copy(error = "Password must be at least 4 characters") }
-            return
-        }
-        if (currentState.exportPassword != currentState.exportConfirmPassword) {
-            _state.update { it.copy(error = "Passwords do not match") }
-            return
-        }
+        val s = _state.value
+        if (s.exportPassword.length < 4) { _state.update { it.copy(error = "Password must be at least 4 characters") }; return }
+        if (s.exportPassword != s.exportConfirmPassword) { _state.update { it.copy(error = "Passwords do not match") }; return }
 
         viewModelScope.launch {
             _state.update { it.copy(isExporting = true, error = null) }
             try {
-                val zipBytes = if (currentState.exportType == "all") {
-                    backupManager.exportAllProfiles(currentState.exportPassword)
-                } else {
-                    val profileId = currentState.selectedProfileId
-                        ?: throw IllegalStateException("No profile selected")
-                    backupManager.exportProfile(profileId, currentState.exportPassword)
-                }
+                val zipBytes = if (s.exportType == "all") backupManager.exportAllProfiles(s.exportPassword)
+                else backupManager.exportProfile(s.selectedProfileId ?: throw IllegalStateException("No profile selected"), s.exportPassword)
 
                 val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                 val filename = "aac4u_backup_$timestamp.zip"
                 val file = File(context.cacheDir, filename)
                 file.writeBytes(zipBytes)
 
-                val uri = FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file
-                )
-
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                     type = "application/zip"
                     putExtra(Intent.EXTRA_STREAM, uri)
                     putExtra(Intent.EXTRA_SUBJECT, "AAC4U Backup - $filename")
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
+                context.startActivity(Intent.createChooser(shareIntent, "Share Backup").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
 
-                context.startActivity(Intent.createChooser(shareIntent, "Share Backup").apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                })
-
-                _state.update {
-                    it.copy(
-                        isExporting = false,
-                        exportSuccess = true,
-                        showExportDialog = false
-                    )
-                }
+                _state.update { it.copy(isExporting = false, exportSuccess = true, showExportDialog = false) }
             } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        isExporting = false,
-                        error = "Export failed: ${e.message}"
-                    )
-                }
+                _state.update { it.copy(isExporting = false, error = "Export failed: ${e.message}") }
             }
         }
     }
 
-    // ── Import ──
-
-    /**
-     * Called from file picker result — sets the URI and opens the dialog.
-     */
     fun startImport(uri: Uri) {
-        _state.update {
-            it.copy(
-                showImportDialog = true,
-                importUri = uri,
-                importPassword = "",
-                importPreview = null,
-                showImportOptions = false,
-                selectedImportProfile = null,
-                importMode = "new",
-                replaceProfileId = null,
-                error = null,
-                importSuccess = false
-            )
-        }
+        _state.update { it.copy(showImportDialog = true, importUri = uri, importPassword = "", importPreview = null, showImportOptions = false, selectedImportProfile = null, importMode = "new", replaceProfileId = null, error = null, importSuccess = false) }
     }
 
-    fun updateImportPassword(password: String) {
-        _state.update { it.copy(importPassword = password, error = null) }
-    }
+    fun updateImportPassword(password: String) { _state.update { it.copy(importPassword = password, error = null) } }
 
     fun decryptAndPreview() {
-        val currentState = _state.value
-        val uri = currentState.importUri
-
-        if (uri == null) {
-            _state.update { it.copy(error = "No backup file selected") }
-            return
-        }
-
-        if (currentState.importPassword.isEmpty()) {
-            _state.update { it.copy(error = "Please enter a password") }
-            return
-        }
+        val s = _state.value
+        val uri = s.importUri
+        if (uri == null) { _state.update { it.copy(error = "No backup file selected") }; return }
+        if (s.importPassword.isEmpty()) { _state.update { it.copy(error = "Please enter a password") }; return }
 
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, error = null) }
             try {
-                val backupData = backupManager.readBackup(uri, currentState.importPassword)
-                _state.update {
-                    it.copy(
-                        isImporting = false,
-                        importPreview = backupData,
-                        showImportOptions = true
-                    )
-                }
+                val backupData = backupManager.readBackup(uri, s.importPassword)
+                _state.update { it.copy(isImporting = false, importPreview = backupData, showImportOptions = true) }
             } catch (e: Exception) {
-                val message = if (e.message?.contains("Incorrect password") == true ||
-                    e.message?.contains("AEADBadTagException") == true) {
-                    "Incorrect password"
-                } else {
-                    "Failed to read backup: ${e.message}"
-                }
+                val message = if (e.message?.contains("Incorrect password") == true || e.message?.contains("AEADBadTagException") == true) "Incorrect password"
+                else "Failed to read backup: ${e.message}"
                 _state.update { it.copy(isImporting = false, error = message) }
             }
         }
     }
 
-    fun selectImportProfile(profile: ProfileBackup) {
-        _state.update { it.copy(selectedImportProfile = profile) }
-    }
-
-    fun setImportMode(mode: String) {
-        _state.update { it.copy(importMode = mode) }
-    }
-
-    fun setReplaceProfileId(profileId: Long) {
-        _state.update { it.copy(replaceProfileId = profileId) }
-    }
+    fun selectImportProfile(profile: ProfileBackup) { _state.update { it.copy(selectedImportProfile = profile) } }
+    fun setImportMode(mode: String) { _state.update { it.copy(importMode = mode) } }
+    fun setReplaceProfileId(profileId: Long) { _state.update { it.copy(replaceProfileId = profileId) } }
 
     fun executeImport() {
-        val currentState = _state.value
-        val preview = currentState.importPreview ?: return
+        val s = _state.value
+        val preview = s.importPreview ?: return
+        val uri = s.importUri
+        val password = s.importPassword
 
         viewModelScope.launch {
             _state.update { it.copy(isImporting = true, error = null) }
             try {
-                if (currentState.selectedImportProfile != null) {
-                    val profile = currentState.selectedImportProfile
-                    if (currentState.importMode == "replace" && currentState.replaceProfileId != null) {
-                        backupManager.importReplaceProfile(currentState.replaceProfileId, profile)
+                if (s.selectedImportProfile != null) {
+                    val profile = s.selectedImportProfile
+                    if (s.importMode == "replace" && s.replaceProfileId != null) {
+                        backupManager.importReplaceProfile(s.replaceProfileId, profile, uri = uri, password = password)
                     } else {
-                        backupManager.importAsNewProfile(profile)
+                        backupManager.importAsNewProfile(profile, uri = uri, password = password)
                     }
                 } else {
-                    backupManager.importAllAsNew(preview)
+                    backupManager.importAllAsNew(preview, uri = uri, password = password)
                 }
 
-                _state.update {
-                    it.copy(
-                        isImporting = false,
-                        importSuccess = true,
-                        showImportDialog = false,
-                        showImportOptions = false
-                    )
-                }
+                _state.update { it.copy(isImporting = false, importSuccess = true, showImportDialog = false, showImportOptions = false) }
             } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        isImporting = false,
-                        error = "Import failed: ${e.message}"
-                    )
-                }
+                _state.update { it.copy(isImporting = false, error = "Import failed: ${e.message}") }
             }
         }
     }
 
-    fun dismissExportDialog() {
-        _state.update { it.copy(showExportDialog = false, error = null) }
-    }
-
-    fun dismissImportDialog() {
-        _state.update {
-            it.copy(
-                showImportDialog = false,
-                showImportOptions = false,
-                importUri = null,
-                importPreview = null,
-                error = null
-            )
-        }
-    }
-
-    fun clearSuccessState() {
-        _state.update { it.copy(exportSuccess = false, importSuccess = false) }
-    }
+    fun dismissExportDialog() { _state.update { it.copy(showExportDialog = false, error = null) } }
+    fun dismissImportDialog() { _state.update { it.copy(showImportDialog = false, showImportOptions = false, importUri = null, importPreview = null, error = null) } }
+    fun clearSuccessState() { _state.update { it.copy(exportSuccess = false, importSuccess = false) } }
 }

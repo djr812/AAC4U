@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.sp
 fun DrawerContent(
     currentRoute: String?,
     isEditMode: Boolean,
+    activeProfileName: String?,
+    activeProfileAvatar: String?,
     onNavigate: (Screen) -> Unit,
     onToggleEditMode: () -> Unit,
     onClose: () -> Unit,
@@ -23,25 +25,46 @@ fun DrawerContent(
         modifier = modifier.width(280.dp),
         drawerContainerColor = MaterialTheme.colorScheme.surface
     ) {
-        // ── App Header ──
+        // ── App Header with Profile ──
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 24.dp)
         ) {
             Column {
-                Text(
-                    text = "AAC4U",
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "AAC4U",
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Communication made easy",
-                    fontSize = 14.sp,
-                    color = Color(0xFF9E9E9E)
-                )
+                if (activeProfileName != null && activeProfileName != "Default") {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (activeProfileAvatar != null) {
+                            Text(text = activeProfileAvatar, fontSize = 18.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        Text(
+                            text = activeProfileName,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF2E7D32)
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "No profile selected",
+                        fontSize = 14.sp,
+                        color = Color(0xFF9E9E9E)
+                    )
+                }
             }
         }
 

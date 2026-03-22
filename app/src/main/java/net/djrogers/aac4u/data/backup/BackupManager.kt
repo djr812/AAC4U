@@ -2,6 +2,7 @@ package net.djrogers.aac4u.data.backup
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -12,6 +13,7 @@ import net.djrogers.aac4u.data.local.database.AAC4UDatabase
 import net.djrogers.aac4u.data.local.database.entity.*
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.security.SecureRandom
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -30,6 +32,7 @@ class BackupManager @Inject constructor(
     private val database: AAC4UDatabase
 ) {
     companion object {
+        private const val TAG = "AAC4U_BACKUP"
         private const val SALT_SIZE = 16
         private const val IV_SIZE = 12
         private const val GCM_TAG_LENGTH = 128
@@ -39,202 +42,196 @@ class BackupManager @Inject constructor(
         private const val SALT_ENTRY_NAME = "salt.bin"
         private const val IV_ENTRY_NAME = "iv.bin"
         private const val META_ENTRY_NAME = "meta.json"
+        private const val IMAGES_PREFIX = "images/"
+        private const val DOWNLOADED_DIR = "downloaded_symbols"
     }
 
-    private val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    private val json = Json { prettyPrint = true; ignoreUnknownKeys = true }
+    private val downloadedDir: File by lazy { File(context.filesDir, DOWNLOADED_DIR) }
 
-    // ══════════════════════════════════════
-    // EXPORT
-    // ══════════════════════════════════════
-
-    /**
-     * Export a single profile as an encrypted ZIP.
-     * Returns the ZIP bytes ready to be written to a file or shared.
-     */
     suspend fun exportProfile(profileId: Long, password: String): ByteArray = withContext(Dispatchers.IO) {
         val profileEntity = database.profileDao().getProfileById(profileId)
             ?: throw IllegalArgumentException("Profile not found")
-
         val profileBackup = buildProfileBackup(profileEntity)
-        val backupData = BackupData(
-            backupType = "single_profile",
-            profiles = listOf(profileBackup)
-        )
-
-        createEncryptedZip(backupData, password)
+        val backupData = BackupData(backupType = "single_profile", profiles = listOf(profileBackup))
+        val imageFiles = collectImageFiles(listOf(profileBackup))
+        createEncryptedZip(backupData, password, imageFiles)
     }
 
-    /**
-     * Export all profiles (except Default template) as an encrypted ZIP.
-     */
     suspend fun exportAllProfiles(password: String): ByteArray = withContext(Dispatchers.IO) {
         val allProfiles = database.profileDao().getAllProfiles().first()
         val userProfiles = allProfiles.filter { it.name != "Default" }
-
-        if (userProfiles.isEmpty()) {
-            throw IllegalStateException("No profiles to export")
-        }
+        if (userProfiles.isEmpty()) throw IllegalStateException("No profiles to export")
 
         val profileBackups = userProfiles.map { buildProfileBackup(it) }
-        val backupData = BackupData(
-            backupType = "all_profiles",
-            profiles = profileBackups
-        )
+        val backupData = BackupData(backupType = "all_profiles", profiles = profileBackups)
+        val imageFiles = collectImageFiles(profileBackups)
 
-        createEncryptedZip(backupData, password)
+        for (pb in profileBackups) {
+            Log.d(TAG, "EXPORT profile '${pb.name}': ${pb.categories.size} categories")
+            for (cat in pb.categories) {
+                Log.d(TAG, "  EXPORT cat '${cat.name}' (${cat.vocabularyType}): ${cat.buttons.size} buttons")
+                for (btn in cat.buttons) {
+                    Log.d(TAG, "    EXPORT btn: '${btn.label}'")
+                }
+            }
+        }
+
+        createEncryptedZip(backupData, password, imageFiles)
     }
 
-    // ══════════════════════════════════════
-    // IMPORT
-    // ══════════════════════════════════════
-
-    /**
-     * Read and decrypt a backup file, returning the parsed BackupData.
-     * Call this first to preview what's in the backup before importing.
-     */
     suspend fun readBackup(uri: Uri, password: String): BackupData = withContext(Dispatchers.IO) {
         val zipBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: throw IllegalArgumentException("Cannot read backup file")
-
-        decryptZip(zipBytes, password)
+        val (backupData, _) = decryptZip(zipBytes, password)
+        for (pb in backupData.profiles) {
+            Log.d(TAG, "READ profile '${pb.name}': ${pb.categories.size} categories")
+            for (cat in pb.categories) {
+                Log.d(TAG, "  READ cat '${cat.name}' (${cat.vocabularyType}): ${cat.buttons.size} buttons")
+                for (btn in cat.buttons) {
+                    Log.d(TAG, "    READ btn: '${btn.label}'")
+                }
+            }
+        }
+        backupData
     }
 
-    /**
-     * Import a single profile from backup data, adding it as a new profile.
-     */
-    suspend fun importAsNewProfile(profileBackup: ProfileBackup): Long = withContext(Dispatchers.IO) {
+    suspend fun importAsNewProfile(profileBackup: ProfileBackup, uri: Uri? = null, password: String? = null): Long = withContext(Dispatchers.IO) {
+        if (uri != null && password != null) restoreImages(uri, password)
+
         val profileId = database.profileDao().insertProfile(
             ProfileEntity(
-                name = profileBackup.name,
-                avatar = profileBackup.avatar,
-                ageRange = profileBackup.ageRange,
-                gridColumns = profileBackup.gridColumns,
-                gridRows = profileBackup.gridRows,
-                buttonPaddingDp = profileBackup.buttonPaddingDp,
-                showLabels = profileBackup.showLabels,
-                labelPosition = profileBackup.labelPosition,
-                inputMethod = profileBackup.inputMethod,
-                feedbackMode = profileBackup.feedbackMode,
-                ttsVoiceName = profileBackup.ttsVoiceName,
-                ttsRate = profileBackup.ttsRate,
-                ttsPitch = profileBackup.ttsPitch,
-                isActive = false,
+                name = profileBackup.name, avatar = profileBackup.avatar, ageRange = profileBackup.ageRange,
+                gridColumns = profileBackup.gridColumns, gridRows = profileBackup.gridRows,
+                buttonPaddingDp = profileBackup.buttonPaddingDp, showLabels = profileBackup.showLabels,
+                labelPosition = profileBackup.labelPosition, inputMethod = profileBackup.inputMethod,
+                feedbackMode = profileBackup.feedbackMode, ttsVoiceName = profileBackup.ttsVoiceName,
+                ttsRate = profileBackup.ttsRate, ttsPitch = profileBackup.ttsPitch, isActive = false,
                 highContrastEnabled = profileBackup.highContrastEnabled,
-                dwellTimeMs = profileBackup.dwellTimeMs,
-                scanSpeedMs = profileBackup.scanSpeedMs
+                dwellTimeMs = profileBackup.dwellTimeMs, scanSpeedMs = profileBackup.scanSpeedMs
             )
         )
 
+        Log.d(TAG, "IMPORT profile '${profileBackup.name}' as ID $profileId: ${profileBackup.categories.size} categories")
         importCategoriesAndButtons(profileId, profileBackup.categories)
         profileId
     }
 
-    /**
-     * Import a profile from backup data, replacing an existing profile's vocabulary.
-     * Keeps the existing profile's ID and active state, replaces everything else.
-     */
-    suspend fun importReplaceProfile(
-        existingProfileId: Long,
-        profileBackup: ProfileBackup
-    ) = withContext(Dispatchers.IO) {
+    suspend fun importReplaceProfile(existingProfileId: Long, profileBackup: ProfileBackup, uri: Uri? = null, password: String? = null) = withContext(Dispatchers.IO) {
+        if (uri != null && password != null) restoreImages(uri, password)
+
         val existing = database.profileDao().getProfileById(existingProfileId)
             ?: throw IllegalArgumentException("Profile not found")
 
-        // Delete all existing categories (cascade deletes buttons too)
-        val existingCategories = database.categoryDao()
-            .getAllCategoriesByProfile(existingProfileId).first()
-        existingCategories.forEach { category ->
-            database.categoryDao().deleteCategory(category.id)
-        }
+        val existingCategories = database.categoryDao().getAllCategoriesByProfile(existingProfileId).first()
+        existingCategories.forEach { database.categoryDao().deleteCategory(it.id) }
 
-        // Update profile settings from backup
-        database.profileDao().updateProfile(
-            existing.copy(
-                name = profileBackup.name,
-                avatar = profileBackup.avatar,
-                ageRange = profileBackup.ageRange,
-                gridColumns = profileBackup.gridColumns,
-                gridRows = profileBackup.gridRows,
-                buttonPaddingDp = profileBackup.buttonPaddingDp,
-                showLabels = profileBackup.showLabels,
-                labelPosition = profileBackup.labelPosition,
-                inputMethod = profileBackup.inputMethod,
-                feedbackMode = profileBackup.feedbackMode,
-                ttsVoiceName = profileBackup.ttsVoiceName,
-                ttsRate = profileBackup.ttsRate,
-                ttsPitch = profileBackup.ttsPitch,
-                highContrastEnabled = profileBackup.highContrastEnabled,
-                dwellTimeMs = profileBackup.dwellTimeMs,
-                scanSpeedMs = profileBackup.scanSpeedMs
-            )
-        )
+        database.profileDao().updateProfile(existing.copy(
+            name = profileBackup.name, avatar = profileBackup.avatar, ageRange = profileBackup.ageRange,
+            gridColumns = profileBackup.gridColumns, gridRows = profileBackup.gridRows,
+            buttonPaddingDp = profileBackup.buttonPaddingDp, showLabels = profileBackup.showLabels,
+            labelPosition = profileBackup.labelPosition, inputMethod = profileBackup.inputMethod,
+            feedbackMode = profileBackup.feedbackMode, ttsVoiceName = profileBackup.ttsVoiceName,
+            ttsRate = profileBackup.ttsRate, ttsPitch = profileBackup.ttsPitch,
+            highContrastEnabled = profileBackup.highContrastEnabled,
+            dwellTimeMs = profileBackup.dwellTimeMs, scanSpeedMs = profileBackup.scanSpeedMs
+        ))
 
-        // Import categories and buttons
         importCategoriesAndButtons(existingProfileId, profileBackup.categories)
     }
 
-    /**
-     * Import all profiles from a backup, each as a new profile.
-     */
-    suspend fun importAllAsNew(backupData: BackupData): List<Long> = withContext(Dispatchers.IO) {
+    suspend fun importAllAsNew(backupData: BackupData, uri: Uri? = null, password: String? = null): List<Long> = withContext(Dispatchers.IO) {
+        if (uri != null && password != null) restoreImages(uri, password)
+
         backupData.profiles.map { profileBackup ->
-            importAsNewProfile(profileBackup)
+            val profileId = database.profileDao().insertProfile(
+                ProfileEntity(
+                    name = profileBackup.name, avatar = profileBackup.avatar, ageRange = profileBackup.ageRange,
+                    gridColumns = profileBackup.gridColumns, gridRows = profileBackup.gridRows,
+                    buttonPaddingDp = profileBackup.buttonPaddingDp, showLabels = profileBackup.showLabels,
+                    labelPosition = profileBackup.labelPosition, inputMethod = profileBackup.inputMethod,
+                    feedbackMode = profileBackup.feedbackMode, ttsVoiceName = profileBackup.ttsVoiceName,
+                    ttsRate = profileBackup.ttsRate, ttsPitch = profileBackup.ttsPitch, isActive = false,
+                    highContrastEnabled = profileBackup.highContrastEnabled,
+                    dwellTimeMs = profileBackup.dwellTimeMs, scanSpeedMs = profileBackup.scanSpeedMs
+                )
+            )
+            Log.d(TAG, "IMPORT ALL: profile '${profileBackup.name}' as ID $profileId: ${profileBackup.categories.size} categories")
+            importCategoriesAndButtons(profileId, profileBackup.categories)
+            profileId
         }
     }
 
     // ══════════════════════════════════════
-    // INTERNAL HELPERS
-    // ══════════════════════════════════════
+
+    private fun collectImageFiles(profiles: List<ProfileBackup>): Map<String, ByteArray> {
+        val imageFiles = mutableMapOf<String, ByteArray>()
+        for (profile in profiles) {
+            for (category in profile.categories) {
+                for (button in category.buttons) {
+                    val imagePath = button.imagePath ?: continue
+                    if (imagePath.startsWith("file:///android_asset/")) continue
+                    val file = File(imagePath)
+                    if (file.exists() && file.length() > 0) {
+                        val entryName = "$IMAGES_PREFIX${file.name}"
+                        if (entryName !in imageFiles) {
+                            imageFiles[entryName] = file.readBytes()
+                            Log.d(TAG, "Including image: ${file.name} (${file.length()} bytes)")
+                        }
+                    } else {
+                        Log.w(TAG, "Image NOT found: $imagePath")
+                    }
+                }
+            }
+        }
+        return imageFiles
+    }
+
+    private fun restoreImages(uri: Uri, password: String) {
+        val zipBytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return
+        downloadedDir.mkdirs()
+        val (_, imageEntries) = decryptZip(zipBytes, password)
+        Log.d(TAG, "Restoring ${imageEntries.size} images")
+        for ((entryName, imageBytes) in imageEntries) {
+            val filename = entryName.removePrefix(IMAGES_PREFIX)
+            val targetFile = File(downloadedDir, filename)
+            targetFile.writeBytes(imageBytes)
+            Log.d(TAG, "Restored: $filename (${imageBytes.size} bytes)")
+        }
+    }
 
     private suspend fun buildProfileBackup(profileEntity: ProfileEntity): ProfileBackup {
-        val categories = database.categoryDao()
-            .getAllCategoriesByProfile(profileEntity.id).first()
+        val categories = database.categoryDao().getAllCategoriesByProfile(profileEntity.id).first()
+        Log.d(TAG, "Building backup for '${profileEntity.name}': ${categories.size} categories (IDs: ${categories.map { it.id }})")
 
         val categoryBackups = categories.map { category ->
-            val buttons = database.buttonDao()
-                .getAllButtonsByCategory(category.id).first()
+            val buttons = database.buttonDao().getAllButtonsByCategory(category.id).first()
+            Log.d(TAG, "  Cat '${category.name}' ID=${category.id} type=${category.vocabularyType}: ${buttons.size} buttons")
 
             CategoryBackup(
-                name = category.name,
-                iconPath = category.iconPath,
-                sortOrder = category.sortOrder,
-                isVisible = category.isVisible,
+                name = category.name, iconPath = category.iconPath,
+                sortOrder = category.sortOrder, isVisible = category.isVisible,
                 vocabularyType = category.vocabularyType,
                 buttons = buttons.map { button ->
                     ButtonBackup(
-                        label = button.label,
-                        phrase = button.phrase,
-                        imagePath = button.imagePath,
-                        imageType = button.imageType,
-                        sortOrder = button.sortOrder,
-                        isVisible = button.isVisible,
-                        backgroundColor = button.backgroundColor,
-                        isQuickPhrase = button.isQuickPhrase
+                        label = button.label, phrase = button.phrase,
+                        imagePath = button.imagePath, imageType = button.imageType,
+                        sortOrder = button.sortOrder, isVisible = button.isVisible,
+                        backgroundColor = button.backgroundColor, isQuickPhrase = button.isQuickPhrase
                     )
                 }
             )
         }
 
         return ProfileBackup(
-            name = profileEntity.name,
-            avatar = profileEntity.avatar,
-            ageRange = profileEntity.ageRange,
-            gridColumns = profileEntity.gridColumns,
-            gridRows = profileEntity.gridRows,
-            buttonPaddingDp = profileEntity.buttonPaddingDp,
-            showLabels = profileEntity.showLabels,
-            labelPosition = profileEntity.labelPosition,
-            inputMethod = profileEntity.inputMethod,
-            feedbackMode = profileEntity.feedbackMode,
-            ttsVoiceName = profileEntity.ttsVoiceName,
-            ttsRate = profileEntity.ttsRate,
-            ttsPitch = profileEntity.ttsPitch,
+            name = profileEntity.name, avatar = profileEntity.avatar, ageRange = profileEntity.ageRange,
+            gridColumns = profileEntity.gridColumns, gridRows = profileEntity.gridRows,
+            buttonPaddingDp = profileEntity.buttonPaddingDp, showLabels = profileEntity.showLabels,
+            labelPosition = profileEntity.labelPosition, inputMethod = profileEntity.inputMethod,
+            feedbackMode = profileEntity.feedbackMode, ttsVoiceName = profileEntity.ttsVoiceName,
+            ttsRate = profileEntity.ttsRate, ttsPitch = profileEntity.ttsPitch,
             highContrastEnabled = profileEntity.highContrastEnabled,
-            dwellTimeMs = profileEntity.dwellTimeMs,
-            scanSpeedMs = profileEntity.scanSpeedMs,
+            dwellTimeMs = profileEntity.dwellTimeMs, scanSpeedMs = profileEntity.scanSpeedMs,
             categories = categoryBackups
         )
     }
@@ -243,26 +240,21 @@ class BackupManager @Inject constructor(
         for (categoryBackup in categories) {
             val categoryId = database.categoryDao().insertCategory(
                 CategoryEntity(
-                    profileId = profileId,
-                    name = categoryBackup.name,
-                    iconPath = categoryBackup.iconPath,
-                    sortOrder = categoryBackup.sortOrder,
-                    isVisible = categoryBackup.isVisible,
-                    vocabularyType = categoryBackup.vocabularyType
+                    profileId = profileId, name = categoryBackup.name,
+                    iconPath = categoryBackup.iconPath, sortOrder = categoryBackup.sortOrder,
+                    isVisible = categoryBackup.isVisible, vocabularyType = categoryBackup.vocabularyType
                 )
             )
+            Log.d(TAG, "  IMPORTED cat '${categoryBackup.name}' (${categoryBackup.vocabularyType}) as ID $categoryId: ${categoryBackup.buttons.size} buttons")
 
             for (buttonBackup in categoryBackup.buttons) {
+                val resolvedImagePath = resolveImportedImagePath(buttonBackup.imagePath)
                 database.buttonDao().insertButton(
                     ButtonEntity(
-                        categoryId = categoryId,
-                        label = buttonBackup.label,
-                        phrase = buttonBackup.phrase,
-                        imagePath = buttonBackup.imagePath,
-                        imageType = buttonBackup.imageType,
-                        sortOrder = buttonBackup.sortOrder,
-                        isVisible = buttonBackup.isVisible,
-                        backgroundColor = buttonBackup.backgroundColor,
+                        categoryId = categoryId, label = buttonBackup.label,
+                        phrase = buttonBackup.phrase, imagePath = resolvedImagePath,
+                        imageType = buttonBackup.imageType, sortOrder = buttonBackup.sortOrder,
+                        isVisible = buttonBackup.isVisible, backgroundColor = buttonBackup.backgroundColor,
                         isQuickPhrase = buttonBackup.isQuickPhrase
                     )
                 )
@@ -270,105 +262,66 @@ class BackupManager @Inject constructor(
         }
     }
 
-    // ══════════════════════════════════════
-    // ENCRYPTION
-    // ══════════════════════════════════════
+    private fun resolveImportedImagePath(imagePath: String?): String? {
+        if (imagePath.isNullOrBlank()) return null
+        if (imagePath.startsWith("file:///android_asset/")) return imagePath
+        val filename = File(imagePath).name
+        return File(downloadedDir, filename).absolutePath
+    }
 
-    private fun createEncryptedZip(backupData: BackupData, password: String): ByteArray {
-        val jsonString = json.encodeToString(backupData)
-        val jsonBytes = jsonString.toByteArray(Charsets.UTF_8)
-
-        // Generate salt and IV
+    private fun createEncryptedZip(backupData: BackupData, password: String, imageFiles: Map<String, ByteArray> = emptyMap()): ByteArray {
+        val jsonBytes = json.encodeToString(backupData).toByteArray(Charsets.UTF_8)
         val salt = ByteArray(SALT_SIZE).also { SecureRandom().nextBytes(it) }
         val iv = ByteArray(IV_SIZE).also { SecureRandom().nextBytes(it) }
-
-        // Derive key from password
         val key = deriveKey(password, salt)
-
-        // Encrypt
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH, iv))
         val encrypted = cipher.doFinal(jsonBytes)
 
-        // Create metadata
-        val meta = json.encodeToString(
-            mapOf(
-                "version" to "1",
-                "app" to "AAC4U",
-                "encrypted" to "true",
-                "profiles" to backupData.profiles.size.toString(),
-                "type" to backupData.backupType
-            )
-        )
+        val meta = json.encodeToString(mapOf("version" to "2", "app" to "AAC4U", "encrypted" to "true", "profiles" to backupData.profiles.size.toString(), "type" to backupData.backupType, "images" to imageFiles.size.toString()))
 
-        // Package into ZIP
         val zipBytes = ByteArrayOutputStream()
         ZipOutputStream(zipBytes).use { zip ->
-            // Meta (unencrypted — lets the app know what's inside without decrypting)
-            zip.putNextEntry(ZipEntry(META_ENTRY_NAME))
-            zip.write(meta.toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-
-            // Salt
-            zip.putNextEntry(ZipEntry(SALT_ENTRY_NAME))
-            zip.write(salt)
-            zip.closeEntry()
-
-            // IV
-            zip.putNextEntry(ZipEntry(IV_ENTRY_NAME))
-            zip.write(iv)
-            zip.closeEntry()
-
-            // Encrypted data
-            zip.putNextEntry(ZipEntry(ENCRYPTED_ENTRY_NAME))
-            zip.write(encrypted)
-            zip.closeEntry()
+            zip.putNextEntry(ZipEntry(META_ENTRY_NAME)); zip.write(meta.toByteArray(Charsets.UTF_8)); zip.closeEntry()
+            zip.putNextEntry(ZipEntry(SALT_ENTRY_NAME)); zip.write(salt); zip.closeEntry()
+            zip.putNextEntry(ZipEntry(IV_ENTRY_NAME)); zip.write(iv); zip.closeEntry()
+            zip.putNextEntry(ZipEntry(ENCRYPTED_ENTRY_NAME)); zip.write(encrypted); zip.closeEntry()
+            for ((entryName, imageBytes) in imageFiles) {
+                zip.putNextEntry(ZipEntry(entryName)); zip.write(imageBytes); zip.closeEntry()
+            }
         }
-
         return zipBytes.toByteArray()
     }
 
-    private fun decryptZip(zipBytes: ByteArray, password: String): BackupData {
-        var salt: ByteArray? = null
-        var iv: ByteArray? = null
-        var encrypted: ByteArray? = null
+    private fun decryptZip(zipBytes: ByteArray, password: String): Pair<BackupData, Map<String, ByteArray>> {
+        var salt: ByteArray? = null; var iv: ByteArray? = null; var encrypted: ByteArray? = null
+        val imageEntries = mutableMapOf<String, ByteArray>()
 
         ZipInputStream(ByteArrayInputStream(zipBytes)).use { zip ->
             var entry = zip.nextEntry
             while (entry != null) {
-                when (entry.name) {
-                    SALT_ENTRY_NAME -> salt = zip.readBytes()
-                    IV_ENTRY_NAME -> iv = zip.readBytes()
-                    ENCRYPTED_ENTRY_NAME -> encrypted = zip.readBytes()
+                when {
+                    entry.name == SALT_ENTRY_NAME -> salt = zip.readBytes()
+                    entry.name == IV_ENTRY_NAME -> iv = zip.readBytes()
+                    entry.name == ENCRYPTED_ENTRY_NAME -> encrypted = zip.readBytes()
+                    entry.name.startsWith(IMAGES_PREFIX) && !entry.isDirectory -> imageEntries[entry.name] = zip.readBytes()
                 }
-                zip.closeEntry()
-                entry = zip.nextEntry
+                zip.closeEntry(); entry = zip.nextEntry
             }
         }
+        if (salt == null || iv == null || encrypted == null) throw IllegalArgumentException("Invalid backup file")
 
-        if (salt == null || iv == null || encrypted == null) {
-            throw IllegalArgumentException("Invalid backup file — missing encryption data")
-        }
-
-        // Derive key and decrypt
         val key = deriveKey(password, salt!!)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(GCM_TAG_LENGTH, iv!!))
+        val decrypted = try { cipher.doFinal(encrypted!!) } catch (e: Exception) { throw IllegalArgumentException("Incorrect password or corrupted backup file") }
 
-        val decrypted = try {
-            cipher.doFinal(encrypted!!)
-        } catch (e: Exception) {
-            throw IllegalArgumentException("Incorrect password or corrupted backup file")
-        }
-
-        val jsonString = String(decrypted, Charsets.UTF_8)
-        return json.decodeFromString<BackupData>(jsonString)
+        return Pair(json.decodeFromString(String(decrypted, Charsets.UTF_8)), imageEntries)
     }
 
     private fun deriveKey(password: String, salt: ByteArray): SecretKeySpec {
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         val spec = PBEKeySpec(password.toCharArray(), salt, ITERATION_COUNT, KEY_LENGTH)
-        val secretKey = factory.generateSecret(spec)
-        return SecretKeySpec(secretKey.encoded, "AES")
+        return SecretKeySpec(factory.generateSecret(spec).encoded, "AES")
     }
 }

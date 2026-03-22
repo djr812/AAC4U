@@ -5,6 +5,8 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.runtime.*
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -24,7 +26,8 @@ import net.djrogers.aac4u.ui.settings.SettingsScreen
 @Composable
 fun AAC4UNavHost(
     windowSizeClass: WindowSizeClass,
-    navController: NavHostController = rememberNavController()
+    navController: NavHostController = rememberNavController(),
+    welcomeViewModel: WelcomeViewModel = hiltViewModel()
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -34,6 +37,9 @@ fun AAC4UNavHost(
     val gesturesEnabled = currentRoute == Screen.Grid.route
 
     var isEditMode by remember { mutableStateOf(false) }
+
+    // Active profile state
+    val activeProfile by welcomeViewModel.activeProfile.collectAsStateWithLifecycle()
 
     LaunchedEffect(currentRoute) {
         if (currentRoute != Screen.Grid.route) {
@@ -48,6 +54,8 @@ fun AAC4UNavHost(
             DrawerContent(
                 currentRoute = currentRoute,
                 isEditMode = isEditMode,
+                activeProfileName = activeProfile?.name,
+                activeProfileAvatar = activeProfile?.avatar,
                 onNavigate = { screen ->
                     if (screen.route != currentRoute) {
                         navController.navigate(screen.route) {
