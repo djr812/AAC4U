@@ -73,9 +73,10 @@ fun AACButton(
 
     val displayColor = if (isPressed) AACColors.pressed(resolvedBgColor) else resolvedBgColor
     val textColor = AACColors.textOn(resolvedBgColor)
-
     val borderColor = if (isEditMode) Color(0xFFFF8F00) else Color(0x15000000)
     val borderWidth = if (isEditMode) 2.dp else 1.dp
+
+    val hasImage = button.imagePath != null
 
     Box(
         modifier = modifier
@@ -88,11 +89,7 @@ fun AACButton(
             )
             .clip(MaterialTheme.shapes.medium)
             .background(displayColor)
-            .border(
-                width = borderWidth,
-                color = borderColor,
-                shape = MaterialTheme.shapes.medium
-            )
+            .border(width = borderWidth, color = borderColor, shape = MaterialTheme.shapes.medium)
             .semantics {
                 contentDescription = button.phrase
                 role = Role.Button
@@ -101,9 +98,7 @@ fun AACButton(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = {
-                    // Haptic feedback — subtle tick
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    // Click sound — system 'toc' effect
                     view.playSoundEffect(SoundEffectConstants.CLICK)
                     onTap()
                 },
@@ -112,15 +107,17 @@ fun AACButton(
                     onLongPress()
                 }
             )
-            .padding(4.dp),
+            .padding(3.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            if (button.imagePath != null) {
+        if (hasImage) {
+            // ── Image + Label layout ──
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Symbol image
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(button.imagePath)
@@ -131,40 +128,44 @@ fun AACButton(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(4.dp)
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
                 )
 
+                // Label below image
                 if (showLabel) {
                     Text(
                         text = button.label,
                         color = textColor,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
+                        lineHeight = 14.sp,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 2.dp)
+                            .padding(horizontal = 2.dp, vertical = 1.dp)
                     )
                 }
-            } else {
-                Text(
-                    text = button.label,
-                    color = textColor,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis,
-                    lineHeight = 20.sp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 4.dp)
-                )
             }
+        } else {
+            // ── Text-only layout ──
+            Text(
+                text = button.label,
+                color = textColor,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 20.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp)
+            )
         }
 
+        // Edit mode indicator
         if (isEditMode) {
             Box(
                 modifier = Modifier
@@ -175,10 +176,7 @@ fun AACButton(
                     .background(Color(0xCCFF8F00)),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "✏",
-                    fontSize = 11.sp
-                )
+                Text(text = "✏", fontSize = 11.sp)
             }
         }
     }

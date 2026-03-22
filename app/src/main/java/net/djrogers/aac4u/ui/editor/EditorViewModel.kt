@@ -1,14 +1,21 @@
 package net.djrogers.aac4u.ui.editor
 
+import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import net.djrogers.aac4u.domain.model.AACButton
 import net.djrogers.aac4u.domain.repository.ButtonRepository
 import net.djrogers.aac4u.domain.repository.CategoryRepository
 import net.djrogers.aac4u.domain.repository.ProfileRepository
+import net.djrogers.aac4u.data.symbol.SymbolManager
 import javax.inject.Inject
 
 data class EditDialogState(
@@ -23,17 +30,24 @@ data class EditDialogState(
 
 @HiltViewModel
 class EditorViewModel @Inject constructor(
+    @ApplicationContext private val appContext: Context,
     private val buttonRepository: ButtonRepository,
     private val categoryRepository: CategoryRepository,
-    private val profileRepository: ProfileRepository
+    private val profileRepository: ProfileRepository,
+    private val symbolManager: SymbolManager
 ) : ViewModel() {
 
     private val _editState = MutableStateFlow(EditDialogState())
     val editState: StateFlow<EditDialogState> = _editState.asStateFlow()
 
-    /**
-     * Open the edit dialog for an existing button.
-     */
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private fun showSystemToast(message: String) {
+        mainHandler.post {
+            Toast.makeText(appContext, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun editButton(button: AACButton) {
         _editState.value = EditDialogState(
             isVisible = true,
@@ -46,9 +60,6 @@ class EditorViewModel @Inject constructor(
         )
     }
 
-    /**
-     * Open the edit dialog for creating a new button in a category.
-     */
     fun addNewButton(categoryId: Long) {
         _editState.value = EditDialogState(
             isVisible = true,
@@ -85,9 +96,6 @@ class EditorViewModel @Inject constructor(
         _editState.update { it.copy(showDeleteConfirmation = false) }
     }
 
-    /**
-     * Save the edited or new button.
-     */
     fun saveButton() {
         val state = _editState.value
         val button = state.button ?: return
@@ -96,39 +104,88 @@ class EditorViewModel @Inject constructor(
 
         if (label.isBlank()) return
 
-        // If phrase is empty, use the label as the phrase
         val finalPhrase = phrase.ifBlank { label }
+
+        dismissDialog()
 
         viewModelScope.launch {
             if (state.isNewButton) {
-                // Get the next sort order
-                buttonRepository.getButtonsByCategory(button.categoryId).first().let { buttons ->
-                    val nextOrder = (buttons.maxOfOrNull { it.sortOrder } ?: -1) + 1
-                    buttonRepository.insertButton(
-                        button.copy(
-                            label = label,
-                            phrase = finalPhrase,
-                            backgroundColor = state.editedColor,
-                            sortOrder = nextOrder
-                        )
+                val symbolPath = symbolManager.getSymbolForWord(label)
+
+                val nextOrder = buttonRepository.getButtonsByCategory(button.categoryId)
+                    .first()
+                    .let { buttons -> (buttons.maxOfOrNull { it.sortOrder } ?: -1) + 1 }
+
+                val insertedId = buttonRepository.insertButton(
+                    button.copy(
+                        label = label,
+                        phrase = finalPhrase,
+                        backgroundColor = state.editedColor,
+                        imagePath = symbolPath,
+                        sortOrder = nextOrder
                     )
+                )
+
+                if (symbolPath == null) {
+                    launchSymbolDownload(insertedId, label, finalPhrase, state.editedColor, button.categoryId, nextOrder)
                 }
             } else {
+                val labelChanged = label != button.label
+                var symbolPath = button.imagePath
+
+                if (labelChanged) {
+                    symbolPath = symbolManager.getSymbolForWord(label)
+                }
+
                 buttonRepository.updateButton(
                     button.copy(
                         label = label,
                         phrase = finalPhrase,
-                        backgroundColor = state.editedColor
+                        backgroundColor = state.editedColor,
+                        imagePath = symbolPath
                     )
                 )
+
+                if (labelChanged && symbolPath == null) {
+                    launchSymbolDownload(button.id, label, finalPhrase, state.editedColor, button.categoryId, button.sortOrder)
+                }
             }
-            dismissDialog()
         }
     }
 
-    /**
-     * Toggle button visibility (hide/show).
-     */
+    private fun launchSymbolDownload(
+        buttonId: Long,
+        label: String,
+        phrase: String,
+        backgroundColor: String?,
+        categoryId: Long,
+        sortOrder: Int
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val downloadedPath = symbolManager.searchAndDownloadSymbol(label)
+                if (downloadedPath != null) {
+                    buttonRepository.updateButton(
+                        AACButton(
+                            id = buttonId,
+                            categoryId = categoryId,
+                            label = label,
+                            phrase = phrase,
+                            imagePath = downloadedPath,
+                            backgroundColor = backgroundColor,
+                            sortOrder = sortOrder
+                        )
+                    )
+                    showSystemToast("✓ Symbol found for \"$label\"")
+                } else {
+                    showSystemToast("No symbol available for \"$label\"")
+                }
+            } catch (e: Exception) {
+                showSystemToast("Could not download symbol — check internet")
+            }
+        }
+    }
+
     fun toggleVisibility() {
         val state = _editState.value
         val button = state.button ?: return
@@ -142,9 +199,6 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Delete the button permanently.
-     */
     fun deleteButton() {
         val state = _editState.value
         val button = state.button ?: return
@@ -156,9 +210,6 @@ class EditorViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Reorder buttons — move a button from one position to another.
-     */
     fun reorderButtons(buttons: List<AACButton>, fromIndex: Int, toIndex: Int) {
         if (fromIndex == toIndex) return
 
