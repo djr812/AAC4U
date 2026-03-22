@@ -204,6 +204,7 @@ fun GridScreen(
                         onToggleExpand = { isCoreExpanded = !isCoreExpanded },
                         onButtonTapped = { button ->
                             viewModel.onButtonTapped(button)
+                            isCoreExpanded = false
                         },
                         onButtonEdit = { button ->
                             editorViewModel.editButton(button)
@@ -263,8 +264,6 @@ fun GridScreen(
                         Text("＋ Add New Button", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
-
-                // Prediction row REMOVED — predictions now show inline in the sentence bar
             }
         }
     }

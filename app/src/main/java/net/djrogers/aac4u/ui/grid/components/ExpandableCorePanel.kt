@@ -116,8 +116,13 @@ fun ExpandableCorePanel(
                                 groupColor = groupColor,
                                 isEditMode = isEditMode,
                                 onTap = {
-                                    if (isEditMode) onButtonEdit(button)
-                                    else onButtonTapped(button)
+                                    if (isEditMode) {
+                                        onButtonEdit(button)
+                                    } else {
+                                        onButtonTapped(button)
+                                        // Auto-close the expanded group
+                                        expandedGroupIndex = -1
+                                    }
                                 }
                             )
                         }
@@ -167,7 +172,7 @@ private fun CoreTriggerButton(
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(button?.imagePath)
-                            .crossfade(true)
+                            .crossfade(false)
                             .build(),
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
@@ -249,7 +254,7 @@ private fun CoreWordGridButton(
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(button.imagePath)
-                        .crossfade(true)
+                        .crossfade(false)
                         .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
