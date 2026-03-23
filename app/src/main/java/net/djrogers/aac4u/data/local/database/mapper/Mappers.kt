@@ -80,6 +80,8 @@ fun ProfileEntity.toDomain(): UserProfile = UserProfile(
     ttsPitch = ttsPitch,
     isActive = isActive,
     highContrastEnabled = highContrastEnabled,
+    largeTextEnabled = largeTextEnabled,
+    reducedAnimationsEnabled = reducedAnimationsEnabled,
     dwellTimeMs = dwellTimeMs,
     scanSpeedMs = scanSpeedMs
 )
@@ -101,6 +103,8 @@ fun UserProfile.toEntity(): ProfileEntity = ProfileEntity(
     ttsPitch = ttsPitch,
     isActive = isActive,
     highContrastEnabled = highContrastEnabled,
+    largeTextEnabled = largeTextEnabled,
+    reducedAnimationsEnabled = reducedAnimationsEnabled,
     dwellTimeMs = dwellTimeMs,
     scanSpeedMs = scanSpeedMs
 )

@@ -23,6 +23,11 @@ data class GridUiState(
     val gridColumns: Int = 4,
     val showLabels: Boolean = true,
 
+    // Accessibility
+    val highContrastEnabled: Boolean = false,
+    val largeTextEnabled: Boolean = false,
+    val reducedAnimationsEnabled: Boolean = false,
+
     // TTS state
     val isSpeaking: Boolean = false,
     val isTtsReady: Boolean = false,
@@ -36,15 +41,9 @@ data class GridUiState(
     val isEditMode: Boolean = false,
     val error: String? = null
 ) {
-    /**
-     * The full sentence assembled from parts, ready for TTS.
-     */
     val fullSentence: String
         get() = sentenceParts.joinToString(" ").trim()
 
-    /**
-     * Whether there's a sentence ready to speak.
-     */
     val hasSentence: Boolean
         get() = sentenceParts.isNotEmpty()
 }

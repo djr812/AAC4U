@@ -64,7 +64,10 @@ class GridViewModel @Inject constructor(
                     _uiState.update { state ->
                         state.copy(
                             gridColumns = profile.gridConfig.columns,
-                            showLabels = profile.gridConfig.showLabels
+                            showLabels = profile.gridConfig.showLabels,
+                            highContrastEnabled = profile.highContrastEnabled,
+                            largeTextEnabled = profile.largeTextEnabled,
+                            reducedAnimationsEnabled = profile.reducedAnimationsEnabled
                         )
                     }
 
@@ -100,10 +103,7 @@ class GridViewModel @Inject constructor(
                 }
 
                 _uiState.update { state ->
-                    state.copy(
-                        categories = fringeCategories,
-                        isLoading = false
-                    )
+                    state.copy(categories = fringeCategories, isLoading = false)
                 }
 
                 val currentCategory = _uiState.value.currentCategory
@@ -114,9 +114,7 @@ class GridViewModel @Inject constructor(
                     selectCategory(fringeCategories.first())
                 } else if (shouldReselect && fringeCategories.isEmpty()) {
                     buttonsJob?.cancel()
-                    _uiState.update { state ->
-                        state.copy(currentCategory = null, buttons = emptyList())
-                    }
+                    _uiState.update { it.copy(currentCategory = null, buttons = emptyList()) }
                 }
             }
         }
@@ -129,14 +127,10 @@ class GridViewModel @Inject constructor(
                 val coreCategory = coreCategories.firstOrNull()
                 if (coreCategory != null) {
                     buttonRepository.getButtonsByCategory(coreCategory.id).collect { buttons ->
-                        _uiState.update { state ->
-                            state.copy(coreButtons = buttons)
-                        }
+                        _uiState.update { it.copy(coreButtons = buttons) }
                     }
                 } else {
-                    _uiState.update { state ->
-                        state.copy(coreButtons = emptyList())
-                    }
+                    _uiState.update { it.copy(coreButtons = emptyList()) }
                 }
             }
         }
@@ -157,67 +151,37 @@ class GridViewModel @Inject constructor(
 
     fun selectCategory(category: Category) {
         _uiState.update { it.copy(currentCategory = category, buttons = emptyList()) }
-
         buttonsJob?.cancel()
         buttonsJob = viewModelScope.launch {
             buttonRepository.getButtonsByCategory(category.id).collect { buttons ->
-                _uiState.update { state ->
-                    state.copy(buttons = buttons)
-                }
+                _uiState.update { it.copy(buttons = buttons) }
             }
         }
     }
 
     fun onButtonTapped(button: AACButton) {
         val updatedParts = buildSentenceUseCase.addPart(button.phrase)
-        _uiState.update { state ->
-            state.copy(
-                sentenceParts = updatedParts,
-                lastTappedButtonId = button.id,
-                predictedButtons = emptyList()
-            )
-        }
-
+        _uiState.update { it.copy(sentenceParts = updatedParts, lastTappedButtonId = button.id, predictedButtons = emptyList()) }
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
-            selectButtonUseCase(
-                button = button,
-                previousButtonId = _uiState.value.lastTappedButtonId,
-                profileId = profileId
-            )
+            selectButtonUseCase(button = button, previousButtonId = _uiState.value.lastTappedButtonId, profileId = profileId)
             updatePredictions(profileId, button.id)
         }
     }
 
     fun onPredictionAccepted(button: AACButton) {
         val updatedParts = buildSentenceUseCase.addPart(button.phrase)
-        _uiState.update { state ->
-            state.copy(
-                sentenceParts = updatedParts,
-                lastTappedButtonId = button.id,
-                predictedButtons = emptyList()
-            )
-        }
-
+        _uiState.update { it.copy(sentenceParts = updatedParts, lastTappedButtonId = button.id, predictedButtons = emptyList()) }
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
-            selectButtonUseCase(
-                button = button,
-                previousButtonId = _uiState.value.lastTappedButtonId,
-                profileId = profileId
-            )
+            selectButtonUseCase(button = button, previousButtonId = _uiState.value.lastTappedButtonId, profileId = profileId)
             updatePredictions(profileId, button.id)
         }
     }
 
-    /**
-     * Apply a suffix to the last word in the sentence.
-     * Uses the EnglishSuffixEngine for proper morphology.
-     */
     fun applySuffix(suffixType: String) {
         val currentParts = _uiState.value.sentenceParts
         if (currentParts.isEmpty()) return
-
         val lastWord = currentParts.last()
         val modifiedWord = when (suffixType) {
             "s" -> EnglishSuffixEngine.addPlural(lastWord)
@@ -228,21 +192,16 @@ class GridViewModel @Inject constructor(
             "nt" -> EnglishSuffixEngine.addNegation(lastWord)
             else -> lastWord
         }
-
         if (modifiedWord != lastWord) {
             val updatedParts = buildSentenceUseCase.replaceLastPart(modifiedWord)
-            _uiState.update { state ->
-                state.copy(sentenceParts = updatedParts)
-            }
+            _uiState.update { it.copy(sentenceParts = updatedParts) }
         }
     }
 
     fun speakSentence() {
         val sentence = _uiState.value.fullSentence
         if (sentence.isBlank()) return
-
         tts.speakPhrase(sentence)
-
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
             speakPhraseUseCase(sentence, profileId)
@@ -251,15 +210,10 @@ class GridViewModel @Inject constructor(
 
     fun speakButtonDirectly(button: AACButton) {
         tts.speakPhrase(button.phrase)
-
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
             speakPhraseUseCase(button.phrase, profileId)
-            selectButtonUseCase(
-                button = button,
-                previousButtonId = _uiState.value.lastTappedButtonId,
-                profileId = profileId
-            )
+            selectButtonUseCase(button = button, previousButtonId = _uiState.value.lastTappedButtonId, profileId = profileId)
             _uiState.update { it.copy(lastTappedButtonId = button.id) }
             updatePredictions(profileId, button.id)
         }
@@ -267,29 +221,17 @@ class GridViewModel @Inject constructor(
 
     fun removeLastPart() {
         val updatedParts = buildSentenceUseCase.removeLastPart()
-        _uiState.update { state ->
-            state.copy(sentenceParts = updatedParts, predictedButtons = emptyList())
-        }
+        _uiState.update { it.copy(sentenceParts = updatedParts, predictedButtons = emptyList()) }
     }
 
     fun clearSentence() {
         val updatedParts = buildSentenceUseCase.clear()
-        _uiState.update { state ->
-            state.copy(
-                sentenceParts = updatedParts,
-                lastTappedButtonId = null,
-                predictedButtons = emptyList()
-            )
-        }
+        _uiState.update { it.copy(sentenceParts = updatedParts, lastTappedButtonId = null, predictedButtons = emptyList()) }
     }
 
-    fun stopSpeaking() {
-        tts.stop()
-    }
+    fun stopSpeaking() { tts.stop() }
 
-    fun toggleEditMode() {
-        _uiState.update { it.copy(isEditMode = !it.isEditMode) }
-    }
+    fun toggleEditMode() { _uiState.update { it.copy(isEditMode = !it.isEditMode) } }
 
     private fun updatePredictions(profileId: Long, lastButtonId: Long) {
         predictionsJob?.cancel()

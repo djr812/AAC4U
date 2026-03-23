@@ -13,7 +13,7 @@ import net.djrogers.aac4u.data.local.database.entity.*
         PhraseHistoryEntity::class,
         PredictionEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AAC4UDatabase : RoomDatabase() {

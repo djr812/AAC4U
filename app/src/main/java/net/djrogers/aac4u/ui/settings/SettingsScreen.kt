@@ -136,7 +136,7 @@ fun SettingsScreen(
             when (selectedTab) {
                 SettingsTab.VOICE -> VoiceSettingsContent(state = state, viewModel = viewModel)
                 SettingsTab.GRID -> GridSettingsContent()
-                SettingsTab.ACCESSIBILITY -> StubContent("♿", "Accessibility", "High contrast mode, input method selection (tap, dwell, switch, scanning), and timing adjustments will be available here.")
+                SettingsTab.ACCESSIBILITY -> AccessibilitySettingsContent()
                 SettingsTab.BACKUP -> BackupSettingsContent()
             }
         }
@@ -286,21 +286,6 @@ private fun VoiceSettingsContent(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun StubContent(emoji: String, title: String, description: String) {
-    Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = emoji, fontSize = 48.sp)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = title, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = description, fontSize = 15.sp, color = Color(0xFF757575), lineHeight = 22.sp, textAlign = TextAlign.Center)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text("Coming soon", fontSize = 14.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium)
         }
     }
 }

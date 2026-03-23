@@ -17,6 +17,9 @@ fun AACButtonGrid(
     showLabels: Boolean,
     isEditMode: Boolean,
     categoryColor: Color,
+    highContrast: Boolean = false,
+    largeText: Boolean = false,
+    reducedAnimations: Boolean = false,
     onButtonTapped: (AACButtonModel) -> Unit,
     onButtonLongPressed: (AACButtonModel) -> Unit,
     modifier: Modifier = Modifier
@@ -31,13 +34,16 @@ fun AACButtonGrid(
         items(
             items = buttons,
             key = { it.id },
-            contentType = { "aac_button" } // Helps Compose reuse compositions
+            contentType = { "aac_button" }
         ) { button ->
             AACButton(
                 button = button,
                 showLabel = showLabels,
                 categoryColor = categoryColor,
                 isEditMode = isEditMode,
+                highContrast = highContrast,
+                largeText = largeText,
+                reducedAnimations = reducedAnimations,
                 onTap = { onButtonTapped(button) },
                 onLongPress = { onButtonLongPressed(button) },
                 modifier = Modifier

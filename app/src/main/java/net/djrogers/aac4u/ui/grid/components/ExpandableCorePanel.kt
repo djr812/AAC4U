@@ -2,6 +2,7 @@ package net.djrogers.aac4u.ui.grid.components
 
 import android.view.SoundEffectConstants
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -33,6 +34,9 @@ fun ExpandableCorePanel(
     coreButtons: List<AACButton>,
     isEditMode: Boolean,
     isExpanded: Boolean,
+    highContrast: Boolean = false,
+    largeText: Boolean = false,
+    reducedAnimations: Boolean = false,
     onToggleExpand: () -> Unit,
     onButtonTapped: (AACButton) -> Unit,
     onButtonEdit: (AACButton) -> Unit,
@@ -42,7 +46,6 @@ fun ExpandableCorePanel(
     val groups = CoreWordGroups.ALL_GROUPS
 
     Column(modifier = modifier) {
-        // ── Trigger Row: 10 buttons across ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -62,6 +65,8 @@ fun ExpandableCorePanel(
                     groupColor = group.color,
                     isExpanded = isGroupExpanded,
                     isEditMode = isEditMode,
+                    highContrast = highContrast,
+                    largeText = largeText,
                     onTap = {
                         if (isEditMode && triggerButton != null) {
                             onButtonEdit(triggerButton)
@@ -74,11 +79,12 @@ fun ExpandableCorePanel(
             }
         }
 
-        // ── Expanded Group Grid (10 columns to match) ──
         AnimatedVisibility(
             visible = expandedGroupIndex >= 0,
-            enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+            enter = if (reducedAnimations) EnterTransition.None
+                    else expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+            exit = if (reducedAnimations) ExitTransition.None
+                   else shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
         ) {
             if (expandedGroupIndex >= 0 && expandedGroupIndex < groups.size) {
                 val group = groups[expandedGroupIndex]
@@ -95,7 +101,7 @@ fun ExpandableCorePanel(
                         .fillMaxWidth()
                         .padding(top = 3.dp, start = 2.dp, end = 2.dp),
                     shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFF5F5F5),
+                    color = if (highContrast) Color(0xFF212121) else Color(0xFFF5F5F5),
                     shadowElevation = 2.dp
                 ) {
                     LazyVerticalGrid(
@@ -115,12 +121,13 @@ fun ExpandableCorePanel(
                                 button = button,
                                 groupColor = groupColor,
                                 isEditMode = isEditMode,
+                                highContrast = highContrast,
+                                largeText = largeText,
                                 onTap = {
                                     if (isEditMode) {
                                         onButtonEdit(button)
                                     } else {
                                         onButtonTapped(button)
-                                        // Auto-close the expanded group
                                         expandedGroupIndex = -1
                                     }
                                 }
@@ -140,12 +147,26 @@ private fun CoreTriggerButton(
     groupColor: Color,
     isExpanded: Boolean,
     isEditMode: Boolean,
+    highContrast: Boolean,
+    largeText: Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     val hasImage = button?.imagePath != null
+
+    val effectiveColor = if (highContrast) {
+        groupColor.copy(
+            red = (groupColor.red * 0.6f).coerceIn(0f, 1f),
+            green = (groupColor.green * 0.6f).coerceIn(0f, 1f),
+            blue = (groupColor.blue * 0.6f).coerceIn(0f, 1f)
+        )
+    } else {
+        if (isExpanded) groupColor else groupColor.copy(alpha = 0.7f)
+    }
+
+    val textColor = if (highContrast) Color.White else Color(0xFF212121)
 
     Surface(
         modifier = modifier
@@ -156,9 +177,10 @@ private fun CoreTriggerButton(
                 view.playSoundEffect(SoundEffectConstants.CLICK)
                 onTap()
             },
-        color = if (isExpanded) groupColor else groupColor.copy(alpha = 0.7f),
+        color = effectiveColor,
         shape = RoundedCornerShape(6.dp),
-        shadowElevation = if (isExpanded) 3.dp else 1.dp
+        shadowElevation = if (isExpanded) 3.dp else 1.dp,
+        border = if (highContrast) BorderStroke(2.dp, Color.White) else null
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
@@ -183,9 +205,9 @@ private fun CoreTriggerButton(
                     )
                     Text(
                         text = word,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF212121),
+                        fontSize = if (largeText) 12.sp else 9.sp,
+                        fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.SemiBold,
+                        color = textColor,
                         textAlign = TextAlign.Center,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -194,9 +216,9 @@ private fun CoreTriggerButton(
                 } else {
                     Text(
                         text = word,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF212121),
+                        fontSize = if (largeText) 15.sp else 12.sp,
+                        fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.Bold,
+                        color = textColor,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -208,7 +230,7 @@ private fun CoreTriggerButton(
                 text = if (isExpanded) "▲" else "▼",
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFF546E7A),
+                color = if (highContrast) Color.White.copy(alpha = 0.8f) else Color(0xFF546E7A),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(2.dp)
@@ -222,12 +244,24 @@ private fun CoreWordGridButton(
     button: AACButton,
     groupColor: Color,
     isEditMode: Boolean,
+    highContrast: Boolean,
+    largeText: Boolean,
     onTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     val hasImage = button.imagePath != null
+
+    val effectiveColor = if (highContrast) {
+        groupColor.copy(
+            red = (groupColor.red * 0.6f).coerceIn(0f, 1f),
+            green = (groupColor.green * 0.6f).coerceIn(0f, 1f),
+            blue = (groupColor.blue * 0.6f).coerceIn(0f, 1f)
+        )
+    } else groupColor
+
+    val textColor = if (highContrast) Color.White else Color(0xFF212121)
 
     Surface(
         modifier = modifier
@@ -239,9 +273,10 @@ private fun CoreWordGridButton(
                 view.playSoundEffect(SoundEffectConstants.CLICK)
                 onTap()
             },
-        color = groupColor,
+        color = effectiveColor,
         shape = RoundedCornerShape(6.dp),
-        shadowElevation = 1.dp
+        shadowElevation = 1.dp,
+        border = if (highContrast) BorderStroke(2.dp, Color.White) else null
     ) {
         Column(
             modifier = Modifier
@@ -265,9 +300,9 @@ private fun CoreWordGridButton(
                 )
                 Text(
                     text = button.label,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF212121),
+                    fontSize = if (largeText) 13.sp else 10.sp,
+                    fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    color = textColor,
                     textAlign = TextAlign.Center,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -276,9 +311,9 @@ private fun CoreWordGridButton(
             } else {
                 Text(
                     text = button.label,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF212121),
+                    fontSize = if (largeText) 16.sp else 13.sp,
+                    fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.Bold,
+                    color = textColor,
                     textAlign = TextAlign.Center,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis

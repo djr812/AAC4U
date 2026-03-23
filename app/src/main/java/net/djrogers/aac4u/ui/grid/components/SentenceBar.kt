@@ -23,6 +23,8 @@ fun SentenceBar(
     sentenceParts: List<String>,
     predictedWords: List<AACButton> = emptyList(),
     isSpeaking: Boolean,
+    highContrast: Boolean = false,
+    largeText: Boolean = false,
     onSpeak: () -> Unit,
     onBackspace: () -> Unit,
     onClear: () -> Unit,
@@ -33,21 +35,35 @@ fun SentenceBar(
 ) {
     val scrollState = rememberScrollState()
 
-    // Auto-scroll to end when sentence changes
     LaunchedEffect(sentenceParts.size, predictedWords.size) {
         scrollState.animateScrollTo(scrollState.maxValue)
     }
+
+    // Accessibility-aware colours
+    val barColor = if (highContrast) Color(0xFF0D47A1) else Color(0xFFE3F2FD)
+    val wordChipColor = if (highContrast) Color(0xFF1565C0) else Color(0xFF90CAF9)
+    val wordTextColor = if (highContrast) Color.White else Color(0xFF0D47A1)
+    val suffixBarColor = if (highContrast) Color(0xFF0D47A1).copy(alpha = 0.8f) else Color(0xFFBBDEFB)
+    val placeholderColor = if (highContrast) Color(0xFF90CAF9) else Color(0xFF90A4AE)
+
+    // Accessibility-aware font sizes
+    val wordFontSize = if (largeText) 19.sp else 15.sp
+    val predictionFontSize = if (largeText) 17.sp else 14.sp
+    val placeholderFontSize = if (largeText) 17.sp else 14.sp
+    val suffixFontSize = if (largeText) 15.sp else 12.sp
 
     Column(modifier = modifier) {
         // ── Main sentence bar ──
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(48.dp),
-            shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp,
+                .height(if (largeText) 56.dp else 48.dp),
+            shape = RoundedCornerShape(
+                topStart = 12.dp, topEnd = 12.dp,
                 bottomStart = if (sentenceParts.isNotEmpty()) 0.dp else 12.dp,
-                bottomEnd = if (sentenceParts.isNotEmpty()) 0.dp else 12.dp),
-            color = Color(0xFFE3F2FD),
+                bottomEnd = if (sentenceParts.isNotEmpty()) 0.dp else 12.dp
+            ),
+            color = barColor,
             shadowElevation = 1.dp
         ) {
             Row(
@@ -56,7 +72,6 @@ fun SentenceBar(
                     .padding(horizontal = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Sentence content + predictions
                 Row(
                     modifier = Modifier
                         .weight(1f)
@@ -65,73 +80,62 @@ fun SentenceBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Confirmed words
                     sentenceParts.forEach { part ->
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFF90CAF9),
+                            color = wordChipColor,
                             shadowElevation = 0.5.dp
                         ) {
                             Text(
                                 text = part,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF0D47A1),
+                                fontSize = wordFontSize,
+                                fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.SemiBold,
+                                color = wordTextColor,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
                     }
 
-                    // Inline predictions
                     if (sentenceParts.isNotEmpty() && predictedWords.isNotEmpty()) {
                         predictedWords.take(3).forEach { prediction ->
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = Color(0xFFE0E0E0).copy(alpha = 0.6f),
+                                color = if (highContrast) Color(0xFF424242) else Color(0xFFE0E0E0).copy(alpha = 0.6f),
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
                                     .clickable { onPredictionTapped(prediction) }
                             ) {
                                 Text(
                                     text = prediction.label,
-                                    fontSize = 14.sp,
+                                    fontSize = predictionFontSize,
                                     fontWeight = FontWeight.Normal,
                                     fontStyle = FontStyle.Italic,
-                                    color = Color(0xFF757575),
+                                    color = if (highContrast) Color(0xFFBDBDBD) else Color(0xFF757575),
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
                             }
                         }
                     }
 
-                    // Placeholder
                     if (sentenceParts.isEmpty()) {
                         Text(
                             text = "Tap words to build a sentence...",
-                            fontSize = 14.sp,
-                            color = Color(0xFF90A4AE),
+                            fontSize = placeholderFontSize,
+                            color = placeholderColor,
                             fontStyle = FontStyle.Italic
                         )
                     }
                 }
 
-                // Action buttons
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (sentenceParts.isNotEmpty()) {
-                        IconButton(
-                            onClick = onBackspace,
-                            modifier = Modifier.size(36.dp)
-                        ) {
+                        IconButton(onClick = onBackspace, modifier = Modifier.size(36.dp)) {
                             Text("⌫", fontSize = 18.sp)
                         }
-
-                        IconButton(
-                            onClick = onClear,
-                            modifier = Modifier.size(36.dp)
-                        ) {
+                        IconButton(onClick = onClear, modifier = Modifier.size(36.dp)) {
                             Text("✕", fontSize = 16.sp, color = Color(0xFFEF5350))
                         }
                     }
@@ -140,9 +144,7 @@ fun SentenceBar(
                         modifier = Modifier
                             .size(36.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                if (isSpeaking) onStop() else onSpeak()
-                            },
+                            .clickable { if (isSpeaking) onStop() else onSpeak() },
                         color = if (isSpeaking) Color(0xFFEF5350) else Color(0xFF43A047),
                         shape = RoundedCornerShape(8.dp)
                     ) {
@@ -158,12 +160,12 @@ fun SentenceBar(
             }
         }
 
-        // ── Suffix modifier bar (only visible when sentence has words) ──
+        // ── Suffix modifier bar ──
         if (sentenceParts.isNotEmpty()) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp),
-                color = Color(0xFFBBDEFB),
+                color = suffixBarColor,
             ) {
                 Row(
                     modifier = Modifier
@@ -172,12 +174,12 @@ fun SentenceBar(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SuffixButton("+s", Color(0xFF1565C0)) { onSuffixApplied("s") }
-                    SuffixButton("+ed", Color(0xFF6A1B9A)) { onSuffixApplied("ed") }
-                    SuffixButton("+ing", Color(0xFF2E7D32)) { onSuffixApplied("ing") }
-                    SuffixButton("+er", Color(0xFFE65100)) { onSuffixApplied("er") }
-                    SuffixButton("+est", Color(0xFFC62828)) { onSuffixApplied("est") }
-                    SuffixButton("+n't", Color(0xFF37474F)) { onSuffixApplied("nt") }
+                    SuffixButton("+s", Color(0xFF1565C0), suffixFontSize) { onSuffixApplied("s") }
+                    SuffixButton("+ed", Color(0xFF6A1B9A), suffixFontSize) { onSuffixApplied("ed") }
+                    SuffixButton("+ing", Color(0xFF2E7D32), suffixFontSize) { onSuffixApplied("ing") }
+                    SuffixButton("+er", Color(0xFFE65100), suffixFontSize) { onSuffixApplied("er") }
+                    SuffixButton("+est", Color(0xFFC62828), suffixFontSize) { onSuffixApplied("est") }
+                    SuffixButton("+n't", Color(0xFF37474F), suffixFontSize) { onSuffixApplied("nt") }
                 }
             }
         }
@@ -188,6 +190,7 @@ fun SentenceBar(
 private fun SuffixButton(
     label: String,
     color: Color,
+    fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
     onClick: () -> Unit
 ) {
     Surface(
@@ -199,7 +202,7 @@ private fun SuffixButton(
     ) {
         Text(
             text = label,
-            fontSize = 12.sp,
+            fontSize = fontSize,
             fontWeight = FontWeight.Bold,
             color = Color.White,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)

@@ -42,6 +42,10 @@ fun GridScreen(
 
     var isCoreExpanded by remember { mutableStateOf(false) }
 
+    val hc = uiState.highContrastEnabled
+    val lt = uiState.largeTextEnabled
+    val ra = uiState.reducedAnimationsEnabled
+
     ButtonEditDialog(
         state = editState,
         onLabelChanged = editorViewModel::updateLabel,
@@ -67,17 +71,14 @@ fun GridScreen(
     )
 
     Scaffold(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier.fillMaxSize(),
+        containerColor = if (hc) Color(0xFF121212) else MaterialTheme.colorScheme.background
     ) { paddingValues ->
         if (uiState.isLoading) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
+                modifier = Modifier.fillMaxSize().padding(paddingValues),
                 contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
+            ) { CircularProgressIndicator() }
             return@Scaffold
         }
 
@@ -95,18 +96,12 @@ fun GridScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
-                    onClick = onOpenDrawer,
-                    modifier = Modifier.size(48.dp)
-                ) {
+                IconButton(onClick = onOpenDrawer, modifier = Modifier.size(48.dp)) {
                     Text(
-                        text = "☰",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF616161)
+                        text = "☰", fontSize = 24.sp, fontWeight = FontWeight.Bold,
+                        color = if (hc) Color.White else Color(0xFF616161)
                     )
                 }
-
                 Spacer(modifier = Modifier.width(4.dp))
 
                 if (isEditMode) {
@@ -124,7 +119,7 @@ fun GridScreen(
                         ) {
                             Text(
                                 text = "✏️ Edit Mode — tap buttons or categories to edit",
-                                fontSize = 13.sp,
+                                fontSize = if (lt) 15.sp else 13.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color(0xFFE65100)
                             )
@@ -132,12 +127,7 @@ fun GridScreen(
                                 onClick = onToggleEditMode,
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                             ) {
-                                Text(
-                                    text = "Done",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF43A047)
-                                )
+                                Text("Done", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF43A047))
                             }
                         }
                     }
@@ -146,16 +136,14 @@ fun GridScreen(
                         sentenceParts = uiState.sentenceParts,
                         predictedWords = uiState.predictedButtons,
                         isSpeaking = uiState.isSpeaking,
+                        highContrast = hc,
+                        largeText = lt,
                         onSpeak = viewModel::speakSentence,
                         onBackspace = viewModel::removeLastPart,
                         onClear = viewModel::clearSentence,
                         onStop = viewModel::stopSpeaking,
-                        onPredictionTapped = { button ->
-                            viewModel.onPredictionAccepted(button)
-                        },
-                        onSuffixApplied = { suffixType ->
-                            viewModel.applySuffix(suffixType)
-                        },
+                        onPredictionTapped = { viewModel.onPredictionAccepted(it) },
+                        onSuffixApplied = { viewModel.applySuffix(it) },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -167,9 +155,7 @@ fun GridScreen(
 
             if (!hasContent && !isEditMode) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(
@@ -179,18 +165,15 @@ fun GridScreen(
                         Text(text = "📋", fontSize = 48.sp)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "This profile is empty",
-                            fontSize = 20.sp,
+                            text = "This profile is empty", fontSize = 20.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = if (hc) Color.White else MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             text = "Use Edit Mode to add categories and buttons, or switch to a profile that has vocabulary set up.",
-                            fontSize = 15.sp,
-                            color = Color(0xFF757575),
-                            textAlign = TextAlign.Center,
-                            lineHeight = 22.sp
+                            fontSize = 15.sp, color = if (hc) Color(0xFFBDBDBD) else Color(0xFF757575),
+                            textAlign = TextAlign.Center, lineHeight = 22.sp
                         )
                     }
                 }
@@ -200,14 +183,15 @@ fun GridScreen(
                         coreButtons = uiState.coreButtons,
                         isEditMode = isEditMode,
                         isExpanded = isCoreExpanded,
+                        highContrast = hc,
+                        largeText = lt,
+                        reducedAnimations = ra,
                         onToggleExpand = { isCoreExpanded = !isCoreExpanded },
                         onButtonTapped = { button ->
                             viewModel.onButtonTapped(button)
                             isCoreExpanded = false
                         },
-                        onButtonEdit = { button ->
-                            editorViewModel.editButton(button)
-                        },
+                        onButtonEdit = { editorViewModel.editButton(it) },
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -234,6 +218,9 @@ fun GridScreen(
                     showLabels = uiState.showLabels,
                     isEditMode = isEditMode,
                     categoryColor = currentCategoryColor,
+                    highContrast = hc,
+                    largeText = lt,
+                    reducedAnimations = ra,
                     onButtonTapped = { button ->
                         if (isEditMode) editorViewModel.editButton(button)
                         else viewModel.onButtonTapped(button)
@@ -241,20 +228,14 @@ fun GridScreen(
                     onButtonLongPressed = { button ->
                         if (!isEditMode) editorViewModel.editButton(button)
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
+                    modifier = Modifier.fillMaxWidth().weight(1f)
                 )
 
                 if (isEditMode && uiState.currentCategory != null) {
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedButton(
-                        onClick = {
-                            uiState.currentCategory?.let { editorViewModel.addNewButton(it.id) }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(44.dp),
+                        onClick = { uiState.currentCategory?.let { editorViewModel.addNewButton(it.id) } },
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text("＋ Add New Button", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)

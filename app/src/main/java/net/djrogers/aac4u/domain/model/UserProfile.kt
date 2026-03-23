@@ -17,6 +17,8 @@ data class UserProfile(
     val ttsPitch: Float = 1.0f,
     val isActive: Boolean = false,
     val highContrastEnabled: Boolean = false,
+    val largeTextEnabled: Boolean = false,
+    val reducedAnimationsEnabled: Boolean = false,
     val dwellTimeMs: Long = 1500,
     val scanSpeedMs: Long = 2000
 )
