@@ -45,6 +45,11 @@ fun ExpandableCorePanel(
     var expandedGroupIndex by remember { mutableStateOf(-1) }
     val groups = CoreWordGroups.ALL_GROUPS
 
+    // Build a map of group index → buttons (including user-added words matched by backgroundColor)
+    val groupedButtons = remember(coreButtons) {
+        buildGroupedButtons(coreButtons, groups)
+    }
+
     Column(modifier = modifier) {
         Row(
             modifier = Modifier
@@ -88,13 +93,7 @@ fun ExpandableCorePanel(
         ) {
             if (expandedGroupIndex >= 0 && expandedGroupIndex < groups.size) {
                 val group = groups[expandedGroupIndex]
-
-                val groupButtons = group.words.mapNotNull { word ->
-                    val button = coreButtons.find {
-                        it.label.equals(word, ignoreCase = true)
-                    }
-                    if (button != null) button to group.color else null
-                }
+                val buttonsForGroup = groupedButtons[expandedGroupIndex] ?: emptyList()
 
                 Surface(
                     modifier = Modifier
@@ -114,7 +113,7 @@ fun ExpandableCorePanel(
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         items(
-                            items = groupButtons,
+                            items = buttonsForGroup,
                             key = { it.first.id }
                         ) { (button, groupColor) ->
                             CoreWordGridButton(
@@ -138,6 +137,49 @@ fun ExpandableCorePanel(
             }
         }
     }
+}
+
+/**
+ * Build a map of group index → list of (button, colour) pairs.
+ * Includes both predefined words and user-added words matched by backgroundColor.
+ */
+private fun buildGroupedButtons(
+    coreButtons: List<AACButton>,
+    groups: List<CoreWordGroup>
+): Map<Int, List<Pair<AACButton, Color>>> {
+    val result = mutableMapOf<Int, MutableList<Pair<AACButton, Color>>>()
+    val assignedIds = mutableSetOf<Long>()
+
+    // First pass: match predefined words by label
+    groups.forEachIndexed { index, group ->
+        val buttonsForGroup = mutableListOf<Pair<AACButton, Color>>()
+
+        for (word in group.words) {
+            val button = coreButtons.find { it.label.equals(word, ignoreCase = true) }
+            if (button != null) {
+                buttonsForGroup.add(button to group.color)
+                assignedIds.add(button.id)
+            }
+        }
+
+        result[index] = buttonsForGroup
+    }
+
+    // Second pass: match unassigned buttons by backgroundColor
+    for (button in coreButtons) {
+        if (button.id in assignedIds) continue
+
+        val matchedGroup = CoreWordGroups.groupForButton(button.label, button.backgroundColor)
+        if (matchedGroup != null) {
+            val groupIndex = groups.indexOf(matchedGroup)
+            if (groupIndex >= 0) {
+                result.getOrPut(groupIndex) { mutableListOf() }.add(button to matchedGroup.color)
+                assignedIds.add(button.id)
+            }
+        }
+    }
+
+    return result
 }
 
 @Composable
@@ -184,33 +226,24 @@ private fun CoreTriggerButton(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(3.dp),
+                modifier = Modifier.fillMaxSize().padding(3.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 if (hasImage) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(button?.imagePath)
-                            .crossfade(false)
-                            .build(),
+                            .data(button?.imagePath).crossfade(false).build(),
                         contentDescription = null,
                         contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .padding(horizontal = 2.dp, vertical = 1.dp)
+                        modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp)
                     )
                     Text(
                         text = word,
                         fontSize = if (largeText) 12.sp else 9.sp,
                         fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.SemiBold,
-                        color = textColor,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        color = textColor, textAlign = TextAlign.Center,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else {
@@ -218,22 +251,16 @@ private fun CoreTriggerButton(
                         text = word,
                         fontSize = if (largeText) 15.sp else 12.sp,
                         fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.Bold,
-                        color = textColor,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        color = textColor, textAlign = TextAlign.Center,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis
                     )
                 }
             }
-
             Text(
-                text = if (isExpanded) "▲" else "▼",
-                fontSize = 8.sp,
+                text = if (isExpanded) "▲" else "▼", fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (highContrast) Color.White.copy(alpha = 0.8f) else Color(0xFF546E7A),
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(2.dp)
+                modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp)
             )
         }
     }
@@ -264,48 +291,35 @@ private fun CoreWordGridButton(
     val textColor = if (highContrast) Color.White else Color(0xFF212121)
 
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
+        modifier = modifier.fillMaxWidth().aspectRatio(1f)
             .clip(RoundedCornerShape(6.dp))
             .clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 view.playSoundEffect(SoundEffectConstants.CLICK)
                 onTap()
             },
-        color = effectiveColor,
-        shape = RoundedCornerShape(6.dp),
+        color = effectiveColor, shape = RoundedCornerShape(6.dp),
         shadowElevation = 1.dp,
         border = if (highContrast) BorderStroke(2.dp, Color.White) else null
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(3.dp),
+            modifier = Modifier.fillMaxSize().padding(3.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             if (hasImage) {
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
-                        .data(button.imagePath)
-                        .crossfade(false)
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .padding(horizontal = 2.dp, vertical = 1.dp)
+                        .data(button.imagePath).crossfade(false).build(),
+                    contentDescription = null, contentScale = ContentScale.Fit,
+                    modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp)
                 )
                 Text(
                     text = button.label,
                     fontSize = if (largeText) 13.sp else 10.sp,
                     fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.SemiBold,
-                    color = textColor,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    color = textColor, textAlign = TextAlign.Center,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.fillMaxWidth()
                 )
             } else {
@@ -313,10 +327,8 @@ private fun CoreWordGridButton(
                     text = button.label,
                     fontSize = if (largeText) 16.sp else 13.sp,
                     fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.Bold,
-                    color = textColor,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    color = textColor, textAlign = TextAlign.Center,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis
                 )
             }
         }

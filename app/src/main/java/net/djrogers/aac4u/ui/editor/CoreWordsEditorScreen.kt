@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.djrogers.aac4u.domain.model.AACButton
+import net.djrogers.aac4u.ui.grid.components.CoreWordGroups
 import net.djrogers.aac4u.ui.theme.AACColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,7 +45,8 @@ fun CoreWordsEditorScreen(
         onShowDeleteConfirmation = editorViewModel::showDeleteConfirmation,
         onConfirmDelete = editorViewModel::deleteButton,
         onCancelDelete = editorViewModel::hideDeleteConfirmation,
-        onDismiss = editorViewModel::dismissDialog
+        onDismiss = editorViewModel::dismissDialog,
+        onWordTypeChanged = editorViewModel::updateWordType
     )
 
     Scaffold(
@@ -96,7 +98,6 @@ fun CoreWordsEditorScreen(
                     CircularProgressIndicator()
                 }
             } else if (state.coreButtons.isEmpty() && state.coreCategoryId == null) {
-                // No core category exists
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
@@ -127,7 +128,7 @@ fun CoreWordsEditorScreen(
                     }
                 }
             } else {
-                // Grid of core words
+                // Grid of core words — colour-coded by group
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(6),
                     modifier = Modifier
@@ -150,11 +151,11 @@ fun CoreWordsEditorScreen(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Add button
+                // Add button — uses addNewCoreWord instead of addNewButton
                 OutlinedButton(
                     onClick = {
                         state.coreCategoryId?.let { categoryId ->
-                            editorViewModel.addNewButton(categoryId)
+                            editorViewModel.addNewCoreWord(categoryId)
                         }
                     },
                     modifier = Modifier
@@ -179,12 +180,23 @@ private fun CoreWordButton(
     button: AACButton,
     onClick: () -> Unit
 ) {
+    // Determine colour: use button's backgroundColor if set, otherwise look up from CoreWordGroups
+    val buttonColor = if (button.backgroundColor != null) {
+        try {
+            Color(android.graphics.Color.parseColor(button.backgroundColor))
+        } catch (e: Exception) {
+            CoreWordGroups.colorForWord(button.label)
+        }
+    } else {
+        CoreWordGroups.colorForWord(button.label)
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(1.2f),
         shape = RoundedCornerShape(8.dp),
-        color = AACColors.Core,
+        color = buttonColor,
         shadowElevation = 2.dp,
         onClick = onClick
     ) {
@@ -201,7 +213,7 @@ private fun CoreWordButton(
                     text = button.label,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = AACColors.textOn(AACColors.Core),
+                    color = Color(0xFF212121),
                     textAlign = TextAlign.Center,
                     maxLines = 2
                 )
@@ -214,7 +226,6 @@ private fun CoreWordButton(
                 }
             }
 
-            // Edit indicator
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)

@@ -56,7 +56,8 @@ fun GridScreen(
         onShowDeleteConfirmation = editorViewModel::showDeleteConfirmation,
         onConfirmDelete = editorViewModel::deleteButton,
         onCancelDelete = editorViewModel::hideDeleteConfirmation,
-        onDismiss = editorViewModel::dismissDialog
+        onDismiss = editorViewModel::dismissDialog,
+        onWordTypeChanged = editorViewModel::updateWordType
     )
 
     CategoryEditDialog(
@@ -75,73 +76,40 @@ fun GridScreen(
         containerColor = if (hc) Color(0xFF121212) else MaterialTheme.colorScheme.background
     ) { paddingValues ->
         if (uiState.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
+            Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
             return@Scaffold
         }
 
-        val currentCategoryColor = uiState.currentCategory?.let {
-            AACColors.forCategory(it.name)
-        } ?: AACColors.forCategory("")
+        val currentCategoryColor = uiState.currentCategory?.let { AACColors.forCategory(it.name) } ?: AACColors.forCategory("")
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onOpenDrawer, modifier = Modifier.size(48.dp)) {
-                    Text(
-                        text = "☰", fontSize = 24.sp, fontWeight = FontWeight.Bold,
-                        color = if (hc) Color.White else Color(0xFF616161)
-                    )
+                    Text("☰", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = if (hc) Color.White else Color(0xFF616161))
                 }
                 Spacer(modifier = Modifier.width(4.dp))
 
                 if (isEditMode) {
                     Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color(0xFFFFF3E0))
-                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                        modifier = Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Color(0xFFFFF3E0)).padding(horizontal = 12.dp, vertical = 10.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                text = "✏️ Edit Mode — tap buttons or categories to edit",
-                                fontSize = if (lt) 15.sp else 13.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFFE65100)
-                            )
-                            TextButton(
-                                onClick = onToggleEditMode,
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                            ) {
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("✏️ Edit Mode — tap buttons or categories to edit", fontSize = if (lt) 15.sp else 13.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFE65100))
+                            TextButton(onClick = onToggleEditMode, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)) {
                                 Text("Done", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF43A047))
                             }
                         }
                     }
                 } else {
                     SentenceBar(
-                        sentenceParts = uiState.sentenceParts,
-                        predictedWords = uiState.predictedButtons,
-                        isSpeaking = uiState.isSpeaking,
-                        highContrast = hc,
-                        largeText = lt,
-                        onSpeak = viewModel::speakSentence,
-                        onBackspace = viewModel::removeLastPart,
-                        onClear = viewModel::clearSentence,
-                        onStop = viewModel::stopSpeaking,
+                        sentenceParts = uiState.sentenceParts, predictedWords = uiState.predictedButtons,
+                        isSpeaking = uiState.isSpeaking, highContrast = hc, largeText = lt,
+                        onSpeak = viewModel::speakSentence, onBackspace = viewModel::removeLastPart,
+                        onClear = viewModel::clearSentence, onStop = viewModel::stopSpeaking,
                         onPredictionTapped = { viewModel.onPredictionAccepted(it) },
                         onSuffixApplied = { viewModel.applySuffix(it) },
                         modifier = Modifier.weight(1f)
@@ -154,43 +122,22 @@ fun GridScreen(
             val hasContent = uiState.categories.isNotEmpty() || uiState.coreButtons.isNotEmpty()
 
             if (!hasContent && !isEditMode) {
-                Box(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(32.dp)
-                    ) {
-                        Text(text = "📋", fontSize = 48.sp)
+                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
+                        Text("📋", fontSize = 48.sp)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "This profile is empty", fontSize = 20.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = if (hc) Color.White else MaterialTheme.colorScheme.onSurface
-                        )
+                        Text("This profile is empty", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = if (hc) Color.White else MaterialTheme.colorScheme.onSurface)
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Use Edit Mode to add categories and buttons, or switch to a profile that has vocabulary set up.",
-                            fontSize = 15.sp, color = if (hc) Color(0xFFBDBDBD) else Color(0xFF757575),
-                            textAlign = TextAlign.Center, lineHeight = 22.sp
-                        )
+                        Text("Use Edit Mode to add categories and buttons, or switch to a profile that has vocabulary set up.", fontSize = 15.sp, color = if (hc) Color(0xFFBDBDBD) else Color(0xFF757575), textAlign = TextAlign.Center, lineHeight = 22.sp)
                     }
                 }
             } else {
                 if (uiState.coreButtons.isNotEmpty()) {
                     ExpandableCorePanel(
-                        coreButtons = uiState.coreButtons,
-                        isEditMode = isEditMode,
-                        isExpanded = isCoreExpanded,
-                        highContrast = hc,
-                        largeText = lt,
-                        reducedAnimations = ra,
+                        coreButtons = uiState.coreButtons, isEditMode = isEditMode, isExpanded = isCoreExpanded,
+                        highContrast = hc, largeText = lt, reducedAnimations = ra,
                         onToggleExpand = { isCoreExpanded = !isCoreExpanded },
-                        onButtonTapped = { button ->
-                            viewModel.onButtonTapped(button)
-                            isCoreExpanded = false
-                        },
+                        onButtonTapped = { viewModel.onButtonTapped(it); isCoreExpanded = false },
                         onButtonEdit = { editorViewModel.editButton(it) },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -199,10 +146,8 @@ fun GridScreen(
 
                 if (uiState.categories.isNotEmpty() || isEditMode) {
                     CategoryTabs(
-                        categories = uiState.categories,
-                        selectedCategory = uiState.currentCategory,
-                        isEditMode = isEditMode,
-                        onCategorySelected = viewModel::selectCategory,
+                        categories = uiState.categories, selectedCategory = uiState.currentCategory,
+                        isEditMode = isEditMode, onCategorySelected = viewModel::selectCategory,
                         onCategoryEdit = { categoryEditorViewModel.showEditDialog(it) },
                         onCategoryMoveUp = { categoryEditorViewModel.moveCategoryUp(it, uiState.categories) },
                         onCategoryMoveDown = { categoryEditorViewModel.moveCategoryDown(it, uiState.categories) },
@@ -213,21 +158,11 @@ fun GridScreen(
                 }
 
                 AACButtonGrid(
-                    buttons = uiState.buttons,
-                    columns = uiState.gridColumns,
-                    showLabels = uiState.showLabels,
-                    isEditMode = isEditMode,
-                    categoryColor = currentCategoryColor,
-                    highContrast = hc,
-                    largeText = lt,
-                    reducedAnimations = ra,
-                    onButtonTapped = { button ->
-                        if (isEditMode) editorViewModel.editButton(button)
-                        else viewModel.onButtonTapped(button)
-                    },
-                    onButtonLongPressed = { button ->
-                        if (!isEditMode) editorViewModel.editButton(button)
-                    },
+                    buttons = uiState.buttons, columns = uiState.gridColumns, showLabels = uiState.showLabels,
+                    isEditMode = isEditMode, categoryColor = currentCategoryColor,
+                    highContrast = hc, largeText = lt, reducedAnimations = ra,
+                    onButtonTapped = { if (isEditMode) editorViewModel.editButton(it) else viewModel.onButtonTapped(it) },
+                    onButtonLongPressed = { if (!isEditMode) editorViewModel.editButton(it) },
                     modifier = Modifier.fillMaxWidth().weight(1f)
                 )
 
@@ -235,11 +170,8 @@ fun GridScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     OutlinedButton(
                         onClick = { uiState.currentCategory?.let { editorViewModel.addNewButton(it.id) } },
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("＋ Add New Button", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                        modifier = Modifier.fillMaxWidth().height(44.dp), shape = RoundedCornerShape(8.dp)
+                    ) { Text("＋ Add New Button", fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
                 }
             }
         }
