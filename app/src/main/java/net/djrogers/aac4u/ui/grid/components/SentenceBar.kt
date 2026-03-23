@@ -31,6 +31,7 @@ fun SentenceBar(
     onStop: () -> Unit,
     onPredictionTapped: (AACButton) -> Unit = {},
     onSuffixApplied: (String) -> Unit = {},
+    onKeyboardTapped: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -39,21 +40,18 @@ fun SentenceBar(
         scrollState.animateScrollTo(scrollState.maxValue)
     }
 
-    // Accessibility-aware colours
     val barColor = if (highContrast) Color(0xFF0D47A1) else Color(0xFFE3F2FD)
     val wordChipColor = if (highContrast) Color(0xFF1565C0) else Color(0xFF90CAF9)
     val wordTextColor = if (highContrast) Color.White else Color(0xFF0D47A1)
     val suffixBarColor = if (highContrast) Color(0xFF0D47A1).copy(alpha = 0.8f) else Color(0xFFBBDEFB)
     val placeholderColor = if (highContrast) Color(0xFF90CAF9) else Color(0xFF90A4AE)
 
-    // Accessibility-aware font sizes
     val wordFontSize = if (largeText) 19.sp else 15.sp
     val predictionFontSize = if (largeText) 17.sp else 14.sp
     val placeholderFontSize = if (largeText) 17.sp else 14.sp
     val suffixFontSize = if (largeText) 15.sp else 12.sp
 
     Column(modifier = modifier) {
-        // ── Main sentence bar ──
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -131,6 +129,11 @@ fun SentenceBar(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Keyboard button
+                    IconButton(onClick = onKeyboardTapped, modifier = Modifier.size(36.dp)) {
+                        Text("⌨", fontSize = 18.sp)
+                    }
+
                     if (sentenceParts.isNotEmpty()) {
                         IconButton(onClick = onBackspace, modifier = Modifier.size(36.dp)) {
                             Text("⌫", fontSize = 18.sp)
@@ -160,7 +163,6 @@ fun SentenceBar(
             }
         }
 
-        // ── Suffix modifier bar ──
         if (sentenceParts.isNotEmpty()) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),

@@ -57,9 +57,7 @@ class GridViewModel @Inject constructor(
 
                     launch { tts.applyProfile(profile.ttsVoiceName, profile.ttsRate, profile.ttsPitch) }
 
-                    if (profileChanged) {
-                        resetGridState()
-                    }
+                    if (profileChanged) resetGridState()
 
                     _uiState.update { state ->
                         state.copy(
@@ -85,31 +83,19 @@ class GridViewModel @Inject constructor(
         coreButtonsJob?.cancel()
         categoriesJob?.cancel()
         predictionsJob?.cancel()
-
         buildSentenceUseCase.clear()
-
-        _uiState.value = GridUiState(
-            isLoading = true,
-            isTtsReady = _uiState.value.isTtsReady
-        )
+        _uiState.value = GridUiState(isLoading = true, isTtsReady = _uiState.value.isTtsReady)
     }
 
     private fun loadCategories(profileId: Long) {
         categoriesJob?.cancel()
         categoriesJob = viewModelScope.launch {
             categoryRepository.getCategoriesByProfile(profileId).collect { allCategories ->
-                val fringeCategories = allCategories.filter {
-                    it.vocabularyType == VocabularyType.FRINGE
-                }
-
-                _uiState.update { state ->
-                    state.copy(categories = fringeCategories, isLoading = false)
-                }
+                val fringeCategories = allCategories.filter { it.vocabularyType == VocabularyType.FRINGE }
+                _uiState.update { it.copy(categories = fringeCategories, isLoading = false) }
 
                 val currentCategory = _uiState.value.currentCategory
-                val shouldReselect = currentCategory == null ||
-                        fringeCategories.none { it.id == currentCategory.id }
-
+                val shouldReselect = currentCategory == null || fringeCategories.none { it.id == currentCategory.id }
                 if (shouldReselect && fringeCategories.isNotEmpty()) {
                     selectCategory(fringeCategories.first())
                 } else if (shouldReselect && fringeCategories.isEmpty()) {
@@ -138,14 +124,10 @@ class GridViewModel @Inject constructor(
 
     private fun observeTtsState() {
         viewModelScope.launch {
-            tts.isSpeaking.collect { speaking ->
-                _uiState.update { it.copy(isSpeaking = speaking) }
-            }
+            tts.isSpeaking.collect { speaking -> _uiState.update { it.copy(isSpeaking = speaking) } }
         }
         viewModelScope.launch {
-            tts.isReady.collect { ready ->
-                _uiState.update { it.copy(isTtsReady = ready) }
-            }
+            tts.isReady.collect { ready -> _uiState.update { it.copy(isTtsReady = ready) } }
         }
     }
 
@@ -177,6 +159,31 @@ class GridViewModel @Inject constructor(
             selectButtonUseCase(button = button, previousButtonId = _uiState.value.lastTappedButtonId, profileId = profileId)
             updatePredictions(profileId, button.id)
         }
+    }
+
+    /**
+     * Add a single typed word to the sentence.
+     */
+    fun addTypedWord(word: String) {
+        val trimmed = word.trim()
+        if (trimmed.isBlank()) return
+
+        val updatedParts = buildSentenceUseCase.addPart(trimmed)
+        _uiState.update { it.copy(sentenceParts = updatedParts, predictedButtons = emptyList()) }
+    }
+
+    /**
+     * Add multiple typed words to the sentence (splits by spaces).
+     */
+    fun addTypedSentence(sentence: String) {
+        val words = sentence.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }
+        if (words.isEmpty()) return
+
+        var updatedParts = _uiState.value.sentenceParts
+        for (word in words) {
+            updatedParts = buildSentenceUseCase.addPart(word)
+        }
+        _uiState.update { it.copy(sentenceParts = updatedParts, predictedButtons = emptyList()) }
     }
 
     fun applySuffix(suffixType: String) {

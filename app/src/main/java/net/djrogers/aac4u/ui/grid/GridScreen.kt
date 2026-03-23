@@ -23,6 +23,7 @@ import net.djrogers.aac4u.ui.editor.EditorViewModel
 import net.djrogers.aac4u.ui.grid.components.AACButtonGrid
 import net.djrogers.aac4u.ui.grid.components.CategoryTabs
 import net.djrogers.aac4u.ui.grid.components.ExpandableCorePanel
+import net.djrogers.aac4u.ui.grid.components.KeyboardInputDialog
 import net.djrogers.aac4u.ui.grid.components.SentenceBar
 import net.djrogers.aac4u.ui.theme.AACColors
 
@@ -41,6 +42,7 @@ fun GridScreen(
     val categoryDialogState by categoryEditorViewModel.dialogState.collectAsStateWithLifecycle()
 
     var isCoreExpanded by remember { mutableStateOf(false) }
+    var showKeyboardDialog by remember { mutableStateOf(false) }
 
     val hc = uiState.highContrastEnabled
     val lt = uiState.largeTextEnabled
@@ -69,6 +71,14 @@ fun GridScreen(
         onConfirmDelete = categoryEditorViewModel::deleteCategory,
         onCancelDelete = categoryEditorViewModel::hideDeleteConfirmation,
         onDismiss = categoryEditorViewModel::dismissDialog
+    )
+
+    // Keyboard input dialog
+    KeyboardInputDialog(
+        isVisible = showKeyboardDialog,
+        onAddWord = { word -> viewModel.addTypedWord(word) },
+        onAddSentence = { sentence -> viewModel.addTypedSentence(sentence) },
+        onDismiss = { showKeyboardDialog = false }
     )
 
     Scaffold(
@@ -112,6 +122,7 @@ fun GridScreen(
                         onClear = viewModel::clearSentence, onStop = viewModel::stopSpeaking,
                         onPredictionTapped = { viewModel.onPredictionAccepted(it) },
                         onSuffixApplied = { viewModel.applySuffix(it) },
+                        onKeyboardTapped = { showKeyboardDialog = true },
                         modifier = Modifier.weight(1f)
                     )
                 }
