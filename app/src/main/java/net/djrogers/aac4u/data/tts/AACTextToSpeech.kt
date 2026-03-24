@@ -23,12 +23,18 @@ class AACTextToSpeech(context: Context) {
     private var tts: TextToSpeech? = null
     private var isInitialised = false
 
-    // Observable speaking state for UI (show "speaking" indicator, highlight words, etc.)
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady.asStateFlow()
+
+    /**
+     * Becomes true after applyProfile() has been called at least once.
+     * Use this to wait for the correct voice before speaking welcome messages.
+     */
+    private val _isProfileApplied = MutableStateFlow(false)
+    val isProfileApplied: StateFlow<Boolean> = _isProfileApplied.asStateFlow()
 
     init {
         tts = TextToSpeech(context.applicationContext) { status ->
@@ -62,9 +68,6 @@ class AACTextToSpeech(context: Context) {
         })
     }
 
-    /**
-     * Speak a full phrase. Flushes any currently speaking audio by default.
-     */
     fun speakPhrase(phrase: String, flush: Boolean = true) {
         if (!isInitialised || phrase.isBlank()) return
 
@@ -74,54 +77,36 @@ class AACTextToSpeech(context: Context) {
         tts?.speak(phrase, queueMode, null, utteranceId)
     }
 
-    /**
-     * Speak a sentence built from multiple parts.
-     */
     fun speakSentence(parts: List<String>, flush: Boolean = true) {
         val sentence = parts.joinToString(" ").trim()
         speakPhrase(sentence, flush)
     }
 
-    /**
-     * Stop any currently speaking audio immediately.
-     */
     fun stop() {
         tts?.stop()
         _isSpeaking.value = false
     }
 
-    /**
-     * Set speech rate. Range: 0.5 (half speed) to 2.0 (double speed). Default: 1.0.
-     */
     fun setSpeechRate(rate: Float) {
         tts?.setSpeechRate(rate.coerceIn(0.5f, 2.0f))
     }
 
-    /**
-     * Set pitch. Range: 0.5 (low) to 2.0 (high). Default: 1.0.
-     */
     fun setPitch(pitch: Float) {
         tts?.setPitch(pitch.coerceIn(0.5f, 2.0f))
     }
 
-    /**
-     * Select a specific voice by name. Pass null for system default.
-     */
     fun setVoice(voiceName: String?) {
         if (voiceName == null) {
             tts?.voice = tts?.defaultVoice
             return
         }
         val voice = getAvailableOfflineVoices().find { it.name == voiceName }
+            ?: getAllVoices().find { it.name == voiceName }
         if (voice != null) {
             tts?.voice = voice
         }
     }
 
-    /**
-     * Get all available voices that work offline.
-     * Offline is critical — AAC users depend on this to communicate.
-     */
     fun getAvailableOfflineVoices(): List<Voice> {
         return tts?.voices
             ?.filter { !it.isNetworkConnectionRequired }
@@ -129,26 +114,21 @@ class AACTextToSpeech(context: Context) {
             ?: emptyList()
     }
 
-    /**
-     * Get ALL available voices (including network-required).
-     * Show these in settings but warn user about offline availability.
-     */
     fun getAllVoices(): List<Voice> {
         return tts?.voices?.sortedBy { it.name } ?: emptyList()
     }
 
     /**
      * Apply a user profile's TTS settings.
+     * Signals isProfileApplied when complete so welcome speech uses the correct voice.
      */
     fun applyProfile(ttsVoiceName: String?, ttsRate: Float, ttsPitch: Float) {
         setVoice(ttsVoiceName)
         setSpeechRate(ttsRate)
         setPitch(ttsPitch)
+        _isProfileApplied.value = true
     }
 
-    /**
-     * Clean up TTS resources. Call when the app is being destroyed.
-     */
     fun shutdown() {
         tts?.stop()
         tts?.shutdown()
@@ -156,5 +136,6 @@ class AACTextToSpeech(context: Context) {
         isInitialised = false
         _isReady.value = false
         _isSpeaking.value = false
+        _isProfileApplied.value = false
     }
 }

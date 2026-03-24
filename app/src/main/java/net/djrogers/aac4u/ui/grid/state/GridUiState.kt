@@ -3,12 +3,7 @@ package net.djrogers.aac4u.ui.grid.state
 import net.djrogers.aac4u.domain.model.AACButton
 import net.djrogers.aac4u.domain.model.Category
 
-/**
- * Represents the complete UI state for the main communication grid.
- * The GridScreen composable renders purely from this state — no side effects.
- */
 data class GridUiState(
-    // Active content
     val categories: List<Category> = emptyList(),
     val currentCategory: Category? = null,
     val buttons: List<AACButton> = emptyList(),
@@ -18,6 +13,7 @@ data class GridUiState(
     // Sentence builder
     val sentenceParts: List<String> = emptyList(),
     val lastTappedButtonId: Long? = null,
+    val selectedWordIndex: Int? = null,
 
     // Grid configuration
     val gridColumns: Int = 4,
@@ -46,4 +42,7 @@ data class GridUiState(
 
     val hasSentence: Boolean
         get() = sentenceParts.isNotEmpty()
+
+    val hasSelectedWord: Boolean
+        get() = selectedWordIndex != null && selectedWordIndex in sentenceParts.indices
 }

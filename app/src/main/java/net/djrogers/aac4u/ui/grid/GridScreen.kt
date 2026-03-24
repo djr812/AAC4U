@@ -73,11 +73,10 @@ fun GridScreen(
         onDismiss = categoryEditorViewModel::dismissDialog
     )
 
-    // Keyboard input dialog
     KeyboardInputDialog(
         isVisible = showKeyboardDialog,
-        onAddWord = { word -> viewModel.addTypedWord(word) },
-        onAddSentence = { sentence -> viewModel.addTypedSentence(sentence) },
+        onAddWord = { viewModel.addTypedWord(it) },
+        onAddSentence = { viewModel.addTypedSentence(it) },
         onDismiss = { showKeyboardDialog = false }
     )
 
@@ -116,13 +115,20 @@ fun GridScreen(
                     }
                 } else {
                     SentenceBar(
-                        sentenceParts = uiState.sentenceParts, predictedWords = uiState.predictedButtons,
-                        isSpeaking = uiState.isSpeaking, highContrast = hc, largeText = lt,
-                        onSpeak = viewModel::speakSentence, onBackspace = viewModel::removeLastPart,
-                        onClear = viewModel::clearSentence, onStop = viewModel::stopSpeaking,
+                        sentenceParts = uiState.sentenceParts,
+                        predictedWords = uiState.predictedButtons,
+                        isSpeaking = uiState.isSpeaking,
+                        highContrast = hc,
+                        largeText = lt,
+                        selectedWordIndex = uiState.selectedWordIndex,
+                        onSpeak = viewModel::speakSentence,
+                        onBackspace = viewModel::removeLastPart,
+                        onClear = viewModel::clearSentence,
+                        onStop = viewModel::stopSpeaking,
                         onPredictionTapped = { viewModel.onPredictionAccepted(it) },
                         onSuffixApplied = { viewModel.applySuffix(it) },
                         onKeyboardTapped = { showKeyboardDialog = true },
+                        onWordTapped = { index -> viewModel.toggleWordSelection(index) },
                         modifier = Modifier.weight(1f)
                     )
                 }

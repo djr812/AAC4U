@@ -40,7 +40,6 @@ class GridViewModel @Inject constructor(
     private var coreButtonsJob: Job? = null
     private var categoriesJob: Job? = null
     private var predictionsJob: Job? = null
-
     private var activeProfileId: Long? = null
 
     init {
@@ -54,13 +53,10 @@ class GridViewModel @Inject constructor(
                 if (profile != null) {
                     val profileChanged = activeProfileId != null && activeProfileId != profile.id
                     activeProfileId = profile.id
-
                     launch { tts.applyProfile(profile.ttsVoiceName, profile.ttsRate, profile.ttsPitch) }
-
                     if (profileChanged) resetGridState()
-
-                    _uiState.update { state ->
-                        state.copy(
+                    _uiState.update {
+                        it.copy(
                             gridColumns = profile.gridConfig.columns,
                             showLabels = profile.gridConfig.showLabels,
                             highContrastEnabled = profile.highContrastEnabled,
@@ -68,7 +64,6 @@ class GridViewModel @Inject constructor(
                             reducedAnimationsEnabled = profile.reducedAnimationsEnabled
                         )
                     }
-
                     loadCategories(profile.id)
                     loadCoreButtons(profile.id)
                 } else {
@@ -79,10 +74,7 @@ class GridViewModel @Inject constructor(
     }
 
     private fun resetGridState() {
-        buttonsJob?.cancel()
-        coreButtonsJob?.cancel()
-        categoriesJob?.cancel()
-        predictionsJob?.cancel()
+        buttonsJob?.cancel(); coreButtonsJob?.cancel(); categoriesJob?.cancel(); predictionsJob?.cancel()
         buildSentenceUseCase.clear()
         _uiState.value = GridUiState(isLoading = true, isTtsReady = _uiState.value.isTtsReady)
     }
@@ -93,12 +85,10 @@ class GridViewModel @Inject constructor(
             categoryRepository.getCategoriesByProfile(profileId).collect { allCategories ->
                 val fringeCategories = allCategories.filter { it.vocabularyType == VocabularyType.FRINGE }
                 _uiState.update { it.copy(categories = fringeCategories, isLoading = false) }
-
                 val currentCategory = _uiState.value.currentCategory
                 val shouldReselect = currentCategory == null || fringeCategories.none { it.id == currentCategory.id }
-                if (shouldReselect && fringeCategories.isNotEmpty()) {
-                    selectCategory(fringeCategories.first())
-                } else if (shouldReselect && fringeCategories.isEmpty()) {
+                if (shouldReselect && fringeCategories.isNotEmpty()) selectCategory(fringeCategories.first())
+                else if (shouldReselect && fringeCategories.isEmpty()) {
                     buttonsJob?.cancel()
                     _uiState.update { it.copy(currentCategory = null, buttons = emptyList()) }
                 }
@@ -115,20 +105,14 @@ class GridViewModel @Inject constructor(
                     buttonRepository.getButtonsByCategory(coreCategory.id).collect { buttons ->
                         _uiState.update { it.copy(coreButtons = buttons) }
                     }
-                } else {
-                    _uiState.update { it.copy(coreButtons = emptyList()) }
-                }
+                } else _uiState.update { it.copy(coreButtons = emptyList()) }
             }
         }
     }
 
     private fun observeTtsState() {
-        viewModelScope.launch {
-            tts.isSpeaking.collect { speaking -> _uiState.update { it.copy(isSpeaking = speaking) } }
-        }
-        viewModelScope.launch {
-            tts.isReady.collect { ready -> _uiState.update { it.copy(isTtsReady = ready) } }
-        }
+        viewModelScope.launch { tts.isSpeaking.collect { speaking -> _uiState.update { it.copy(isSpeaking = speaking) } } }
+        viewModelScope.launch { tts.isReady.collect { ready -> _uiState.update { it.copy(isTtsReady = ready) } } }
     }
 
     fun selectCategory(category: Category) {
@@ -141,9 +125,59 @@ class GridViewModel @Inject constructor(
         }
     }
 
+    // ═══════════════════════════════════════
+    // SENTENCE WORD SELECTION
+    // ═══════════════════════════════════════
+
+    /**
+     * Toggle selection of a word in the sentence bar.
+     * Tap once to select, tap again to deselect.
+     */
+    fun toggleWordSelection(index: Int) {
+        val currentSelection = _uiState.value.selectedWordIndex
+        _uiState.update {
+            it.copy(selectedWordIndex = if (currentSelection == index) null else index)
+        }
+    }
+
+    /**
+     * Clear word selection without modifying the sentence.
+     */
+    fun clearWordSelection() {
+        _uiState.update { it.copy(selectedWordIndex = null) }
+    }
+
+    // ═══════════════════════════════════════
+    // BUTTON TAPS (respects selection)
+    // ═══════════════════════════════════════
+
     fun onButtonTapped(button: AACButton) {
-        val updatedParts = buildSentenceUseCase.addPart(button.phrase)
-        _uiState.update { it.copy(sentenceParts = updatedParts, lastTappedButtonId = button.id, predictedButtons = emptyList()) }
+        val selectedIndex = _uiState.value.selectedWordIndex
+
+        if (selectedIndex != null && selectedIndex in _uiState.value.sentenceParts.indices) {
+            // Replace the selected word
+            val updatedParts = buildSentenceUseCase.replacePartAt(selectedIndex, button.phrase)
+            _uiState.update {
+                it.copy(
+                    sentenceParts = updatedParts,
+                    lastTappedButtonId = button.id,
+                    selectedWordIndex = null, // Auto-deselect after action
+                    predictedButtons = emptyList()
+                )
+            }
+        } else {
+            // Normal append
+            val updatedParts = buildSentenceUseCase.addPart(button.phrase)
+            _uiState.update {
+                it.copy(
+                    sentenceParts = updatedParts,
+                    lastTappedButtonId = button.id,
+                    selectedWordIndex = null,
+                    predictedButtons = emptyList()
+                )
+            }
+        }
+
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
             selectButtonUseCase(button = button, previousButtonId = _uiState.value.lastTappedButtonId, profileId = profileId)
@@ -152,8 +186,16 @@ class GridViewModel @Inject constructor(
     }
 
     fun onPredictionAccepted(button: AACButton) {
+        // Predictions always append (not replace)
         val updatedParts = buildSentenceUseCase.addPart(button.phrase)
-        _uiState.update { it.copy(sentenceParts = updatedParts, lastTappedButtonId = button.id, predictedButtons = emptyList()) }
+        _uiState.update {
+            it.copy(
+                sentenceParts = updatedParts,
+                lastTappedButtonId = button.id,
+                selectedWordIndex = null,
+                predictedButtons = emptyList()
+            )
+        }
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
             selectButtonUseCase(button = button, previousButtonId = _uiState.value.lastTappedButtonId, profileId = profileId)
@@ -161,53 +203,84 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Add a single typed word to the sentence.
-     */
     fun addTypedWord(word: String) {
         val trimmed = word.trim()
         if (trimmed.isBlank()) return
 
-        val updatedParts = buildSentenceUseCase.addPart(trimmed)
-        _uiState.update { it.copy(sentenceParts = updatedParts, predictedButtons = emptyList()) }
+        val selectedIndex = _uiState.value.selectedWordIndex
+
+        if (selectedIndex != null && selectedIndex in _uiState.value.sentenceParts.indices) {
+            // Replace selected word with typed word
+            val updatedParts = buildSentenceUseCase.replacePartAt(selectedIndex, trimmed)
+            _uiState.update { it.copy(sentenceParts = updatedParts, selectedWordIndex = null, predictedButtons = emptyList()) }
+        } else {
+            val updatedParts = buildSentenceUseCase.addPart(trimmed)
+            _uiState.update { it.copy(sentenceParts = updatedParts, selectedWordIndex = null, predictedButtons = emptyList()) }
+        }
     }
 
-    /**
-     * Add multiple typed words to the sentence (splits by spaces).
-     */
     fun addTypedSentence(sentence: String) {
         val words = sentence.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }
         if (words.isEmpty()) return
 
-        var updatedParts = _uiState.value.sentenceParts
-        for (word in words) {
-            updatedParts = buildSentenceUseCase.addPart(word)
+        val selectedIndex = _uiState.value.selectedWordIndex
+
+        if (selectedIndex != null && selectedIndex in _uiState.value.sentenceParts.indices) {
+            // Replace selected word with first typed word, append the rest
+            val updatedParts = buildSentenceUseCase.replacePartAt(selectedIndex, words.first())
+            for (word in words.drop(1)) {
+                buildSentenceUseCase.addPart(word)
+            }
+            _uiState.update {
+                it.copy(
+                    sentenceParts = buildSentenceUseCase.getCurrentParts(),
+                    selectedWordIndex = null,
+                    predictedButtons = emptyList()
+                )
+            }
+        } else {
+            var updatedParts = _uiState.value.sentenceParts
+            for (word in words) {
+                updatedParts = buildSentenceUseCase.addPart(word)
+            }
+            _uiState.update { it.copy(sentenceParts = updatedParts, selectedWordIndex = null, predictedButtons = emptyList()) }
         }
-        _uiState.update { it.copy(sentenceParts = updatedParts, predictedButtons = emptyList()) }
     }
 
     fun applySuffix(suffixType: String) {
         val currentParts = _uiState.value.sentenceParts
         if (currentParts.isEmpty()) return
-        val lastWord = currentParts.last()
+
+        // Apply suffix to selected word, or last word if none selected
+        val targetIndex = _uiState.value.selectedWordIndex ?: (currentParts.size - 1)
+        if (targetIndex !in currentParts.indices) return
+
+        val targetWord = currentParts[targetIndex]
         val modifiedWord = when (suffixType) {
-            "s" -> EnglishSuffixEngine.addPlural(lastWord)
-            "ed" -> EnglishSuffixEngine.addPastTense(lastWord)
-            "ing" -> EnglishSuffixEngine.addPresentParticiple(lastWord)
-            "er" -> EnglishSuffixEngine.addComparative(lastWord)
-            "est" -> EnglishSuffixEngine.addSuperlative(lastWord)
-            "nt" -> EnglishSuffixEngine.addNegation(lastWord)
-            else -> lastWord
+            "s" -> EnglishSuffixEngine.addPlural(targetWord)
+            "ed" -> EnglishSuffixEngine.addPastTense(targetWord)
+            "ing" -> EnglishSuffixEngine.addPresentParticiple(targetWord)
+            "er" -> EnglishSuffixEngine.addComparative(targetWord)
+            "est" -> EnglishSuffixEngine.addSuperlative(targetWord)
+            "nt" -> EnglishSuffixEngine.addNegation(targetWord)
+            else -> targetWord
         }
-        if (modifiedWord != lastWord) {
-            val updatedParts = buildSentenceUseCase.replaceLastPart(modifiedWord)
-            _uiState.update { it.copy(sentenceParts = updatedParts) }
+
+        if (modifiedWord != targetWord) {
+            val updatedParts = buildSentenceUseCase.replacePartAt(targetIndex, modifiedWord)
+            _uiState.update {
+                it.copy(
+                    sentenceParts = updatedParts,
+                    selectedWordIndex = null // Auto-deselect after action
+                )
+            }
         }
     }
 
     fun speakSentence() {
         val sentence = _uiState.value.fullSentence
         if (sentence.isBlank()) return
+        _uiState.update { it.copy(selectedWordIndex = null) }
         tts.speakPhrase(sentence)
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
@@ -227,17 +300,24 @@ class GridViewModel @Inject constructor(
     }
 
     fun removeLastPart() {
-        val updatedParts = buildSentenceUseCase.removeLastPart()
-        _uiState.update { it.copy(sentenceParts = updatedParts, predictedButtons = emptyList()) }
+        val selectedIndex = _uiState.value.selectedWordIndex
+
+        if (selectedIndex != null && selectedIndex in _uiState.value.sentenceParts.indices) {
+            // Remove the selected word specifically
+            val updatedParts = buildSentenceUseCase.removePartAt(selectedIndex)
+            _uiState.update { it.copy(sentenceParts = updatedParts, selectedWordIndex = null, predictedButtons = emptyList()) }
+        } else {
+            val updatedParts = buildSentenceUseCase.removeLastPart()
+            _uiState.update { it.copy(sentenceParts = updatedParts, predictedButtons = emptyList()) }
+        }
     }
 
     fun clearSentence() {
         val updatedParts = buildSentenceUseCase.clear()
-        _uiState.update { it.copy(sentenceParts = updatedParts, lastTappedButtonId = null, predictedButtons = emptyList()) }
+        _uiState.update { it.copy(sentenceParts = updatedParts, lastTappedButtonId = null, selectedWordIndex = null, predictedButtons = emptyList()) }
     }
 
     fun stopSpeaking() { tts.stop() }
-
     fun toggleEditMode() { _uiState.update { it.copy(isEditMode = !it.isEditMode) } }
 
     private fun updatePredictions(profileId: Long, lastButtonId: Long) {

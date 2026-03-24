@@ -1,6 +1,7 @@
 package net.djrogers.aac4u.ui.grid.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -25,6 +26,7 @@ fun SentenceBar(
     isSpeaking: Boolean,
     highContrast: Boolean = false,
     largeText: Boolean = false,
+    selectedWordIndex: Int? = null,
     onSpeak: () -> Unit,
     onBackspace: () -> Unit,
     onClear: () -> Unit,
@@ -32,6 +34,7 @@ fun SentenceBar(
     onPredictionTapped: (AACButton) -> Unit = {},
     onSuffixApplied: (String) -> Unit = {},
     onKeyboardTapped: () -> Unit = {},
+    onWordTapped: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
@@ -42,7 +45,9 @@ fun SentenceBar(
 
     val barColor = if (highContrast) Color(0xFF0D47A1) else Color(0xFFE3F2FD)
     val wordChipColor = if (highContrast) Color(0xFF1565C0) else Color(0xFF90CAF9)
+    val selectedChipColor = if (highContrast) Color(0xFFFF6F00) else Color(0xFFFFB74D)
     val wordTextColor = if (highContrast) Color.White else Color(0xFF0D47A1)
+    val selectedTextColor = if (highContrast) Color.White else Color(0xFF212121)
     val suffixBarColor = if (highContrast) Color(0xFF0D47A1).copy(alpha = 0.8f) else Color(0xFFBBDEFB)
     val placeholderColor = if (highContrast) Color(0xFF90CAF9) else Color(0xFF90A4AE)
 
@@ -78,23 +83,40 @@ fun SentenceBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    sentenceParts.forEach { part ->
+                    sentenceParts.forEachIndexed { index, part ->
+                        val isSelected = selectedWordIndex == index
+
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = wordChipColor,
-                            shadowElevation = 0.5.dp
+                            color = if (isSelected) selectedChipColor else wordChipColor,
+                            shadowElevation = if (isSelected) 2.dp else 0.5.dp,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .then(
+                                    if (isSelected) {
+                                        Modifier.border(
+                                            width = 2.dp,
+                                            color = if (highContrast) Color.White else Color(0xFFE65100),
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                    } else Modifier
+                                )
+                                .clickable { onWordTapped(index) }
                         ) {
                             Text(
                                 text = part,
                                 fontSize = wordFontSize,
-                                fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.SemiBold,
-                                color = wordTextColor,
+                                fontWeight = if (isSelected) FontWeight.ExtraBold
+                                    else if (highContrast) FontWeight.ExtraBold
+                                    else FontWeight.SemiBold,
+                                color = if (isSelected) selectedTextColor else wordTextColor,
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                             )
                         }
                     }
 
-                    if (sentenceParts.isNotEmpty() && predictedWords.isNotEmpty()) {
+                    // Predictions (only when no word is selected)
+                    if (sentenceParts.isNotEmpty() && predictedWords.isNotEmpty() && selectedWordIndex == null) {
                         predictedWords.take(3).forEach { prediction ->
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
@@ -129,7 +151,6 @@ fun SentenceBar(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Keyboard button
                     IconButton(onClick = onKeyboardTapped, modifier = Modifier.size(36.dp)) {
                         Text("⌨", fontSize = 18.sp)
                     }
@@ -163,11 +184,12 @@ fun SentenceBar(
             }
         }
 
+        // Suffix bar
         if (sentenceParts.isNotEmpty()) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(bottomStart = 12.dp, bottomEnd = 12.dp),
-                color = suffixBarColor,
+                color = suffixBarColor
             ) {
                 Row(
                     modifier = Modifier

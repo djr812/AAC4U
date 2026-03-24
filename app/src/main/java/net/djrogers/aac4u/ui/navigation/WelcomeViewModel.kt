@@ -19,7 +19,6 @@ class WelcomeViewModel @Inject constructor(
     private val _activeProfile = MutableStateFlow<UserProfile?>(null)
     val activeProfile: StateFlow<UserProfile?> = _activeProfile.asStateFlow()
 
-    // Track which profile ID we last welcomed, to avoid repeating
     private var lastWelcomedProfileId: Long? = null
     private var hasSpokenStartup = false
 
@@ -33,16 +32,16 @@ class WelcomeViewModel @Inject constructor(
                 _activeProfile.value = profile
 
                 if (profile != null && profile.name != "Default") {
-                    // Wait for TTS to be ready before speaking
+                    // Wait for TTS to be ready AND the voice profile to be applied
+                    // This ensures the welcome is always spoken in the user's chosen voice
                     tts.isReady.first { it }
+                    tts.isProfileApplied.first { it }
 
                     if (!hasSpokenStartup) {
-                        // First time — startup welcome
                         hasSpokenStartup = true
                         lastWelcomedProfileId = profile.id
                         speakWelcome(profile.name)
                     } else if (profile.id != lastWelcomedProfileId) {
-                        // Profile switched
                         lastWelcomedProfileId = profile.id
                         speakWelcome(profile.name)
                     }
