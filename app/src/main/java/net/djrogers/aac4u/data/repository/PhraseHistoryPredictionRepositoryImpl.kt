@@ -24,8 +24,18 @@ class PhraseHistoryRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun searchHistory(profileId: Long, query: String, limit: Int): Flow<List<PhraseHistoryEntry>> {
+        return phraseHistoryDao.searchHistory(profileId, query, limit).map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
     override suspend fun recordPhrase(entry: PhraseHistoryEntry) {
         phraseHistoryDao.insertEntry(entry.toEntity())
+    }
+
+    override suspend fun deleteEntry(id: Long) {
+        phraseHistoryDao.deleteEntry(id)
     }
 
     override suspend fun clearHistory(profileId: Long) {

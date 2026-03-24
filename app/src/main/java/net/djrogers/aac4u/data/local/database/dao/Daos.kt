@@ -120,8 +120,14 @@ interface PhraseHistoryDao {
     @Query("SELECT * FROM phrase_history WHERE profileId = :profileId ORDER BY timestamp DESC LIMIT :limit")
     fun getHistory(profileId: Long, limit: Int): Flow<List<PhraseHistoryEntity>>
 
+    @Query("SELECT * FROM phrase_history WHERE profileId = :profileId AND fullPhrase LIKE '%' || :query || '%' ORDER BY timestamp DESC LIMIT :limit")
+    fun searchHistory(profileId: Long, query: String, limit: Int): Flow<List<PhraseHistoryEntity>>
+
     @Insert
     suspend fun insertEntry(entry: PhraseHistoryEntity)
+
+    @Query("DELETE FROM phrase_history WHERE id = :id")
+    suspend fun deleteEntry(id: Long)
 
     @Query("DELETE FROM phrase_history WHERE profileId = :profileId")
     suspend fun clearHistory(profileId: Long)

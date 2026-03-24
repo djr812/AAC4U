@@ -5,7 +5,9 @@ import net.djrogers.aac4u.domain.model.PhraseHistoryEntry
 
 interface PhraseHistoryRepository {
     fun getHistory(profileId: Long, limit: Int = 50): Flow<List<PhraseHistoryEntry>>
+    fun searchHistory(profileId: Long, query: String, limit: Int = 50): Flow<List<PhraseHistoryEntry>>
     suspend fun recordPhrase(entry: PhraseHistoryEntry)
+    suspend fun deleteEntry(id: Long)
     suspend fun clearHistory(profileId: Long)
     suspend fun exportHistory(profileId: Long): List<PhraseHistoryEntry>
 }

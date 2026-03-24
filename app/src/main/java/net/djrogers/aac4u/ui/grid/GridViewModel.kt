@@ -125,59 +125,24 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    // ═══════════════════════════════════════
-    // SENTENCE WORD SELECTION
-    // ═══════════════════════════════════════
-
-    /**
-     * Toggle selection of a word in the sentence bar.
-     * Tap once to select, tap again to deselect.
-     */
     fun toggleWordSelection(index: Int) {
         val currentSelection = _uiState.value.selectedWordIndex
-        _uiState.update {
-            it.copy(selectedWordIndex = if (currentSelection == index) null else index)
-        }
+        _uiState.update { it.copy(selectedWordIndex = if (currentSelection == index) null else index) }
     }
 
-    /**
-     * Clear word selection without modifying the sentence.
-     */
     fun clearWordSelection() {
         _uiState.update { it.copy(selectedWordIndex = null) }
     }
 
-    // ═══════════════════════════════════════
-    // BUTTON TAPS (respects selection)
-    // ═══════════════════════════════════════
-
     fun onButtonTapped(button: AACButton) {
         val selectedIndex = _uiState.value.selectedWordIndex
-
         if (selectedIndex != null && selectedIndex in _uiState.value.sentenceParts.indices) {
-            // Replace the selected word
             val updatedParts = buildSentenceUseCase.replacePartAt(selectedIndex, button.phrase)
-            _uiState.update {
-                it.copy(
-                    sentenceParts = updatedParts,
-                    lastTappedButtonId = button.id,
-                    selectedWordIndex = null, // Auto-deselect after action
-                    predictedButtons = emptyList()
-                )
-            }
+            _uiState.update { it.copy(sentenceParts = updatedParts, lastTappedButtonId = button.id, selectedWordIndex = null, predictedButtons = emptyList()) }
         } else {
-            // Normal append
             val updatedParts = buildSentenceUseCase.addPart(button.phrase)
-            _uiState.update {
-                it.copy(
-                    sentenceParts = updatedParts,
-                    lastTappedButtonId = button.id,
-                    selectedWordIndex = null,
-                    predictedButtons = emptyList()
-                )
-            }
+            _uiState.update { it.copy(sentenceParts = updatedParts, lastTappedButtonId = button.id, selectedWordIndex = null, predictedButtons = emptyList()) }
         }
-
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
             selectButtonUseCase(button = button, previousButtonId = _uiState.value.lastTappedButtonId, profileId = profileId)
@@ -186,16 +151,8 @@ class GridViewModel @Inject constructor(
     }
 
     fun onPredictionAccepted(button: AACButton) {
-        // Predictions always append (not replace)
         val updatedParts = buildSentenceUseCase.addPart(button.phrase)
-        _uiState.update {
-            it.copy(
-                sentenceParts = updatedParts,
-                lastTappedButtonId = button.id,
-                selectedWordIndex = null,
-                predictedButtons = emptyList()
-            )
-        }
+        _uiState.update { it.copy(sentenceParts = updatedParts, lastTappedButtonId = button.id, selectedWordIndex = null, predictedButtons = emptyList()) }
         viewModelScope.launch {
             val profileId = activeProfileId ?: return@launch
             selectButtonUseCase(button = button, previousButtonId = _uiState.value.lastTappedButtonId, profileId = profileId)
@@ -206,11 +163,8 @@ class GridViewModel @Inject constructor(
     fun addTypedWord(word: String) {
         val trimmed = word.trim()
         if (trimmed.isBlank()) return
-
         val selectedIndex = _uiState.value.selectedWordIndex
-
         if (selectedIndex != null && selectedIndex in _uiState.value.sentenceParts.indices) {
-            // Replace selected word with typed word
             val updatedParts = buildSentenceUseCase.replacePartAt(selectedIndex, trimmed)
             _uiState.update { it.copy(sentenceParts = updatedParts, selectedWordIndex = null, predictedButtons = emptyList()) }
         } else {
@@ -222,39 +176,44 @@ class GridViewModel @Inject constructor(
     fun addTypedSentence(sentence: String) {
         val words = sentence.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }
         if (words.isEmpty()) return
-
         val selectedIndex = _uiState.value.selectedWordIndex
-
         if (selectedIndex != null && selectedIndex in _uiState.value.sentenceParts.indices) {
-            // Replace selected word with first typed word, append the rest
-            val updatedParts = buildSentenceUseCase.replacePartAt(selectedIndex, words.first())
-            for (word in words.drop(1)) {
-                buildSentenceUseCase.addPart(word)
-            }
-            _uiState.update {
-                it.copy(
-                    sentenceParts = buildSentenceUseCase.getCurrentParts(),
-                    selectedWordIndex = null,
-                    predictedButtons = emptyList()
-                )
-            }
+            buildSentenceUseCase.replacePartAt(selectedIndex, words.first())
+            for (word in words.drop(1)) buildSentenceUseCase.addPart(word)
+            _uiState.update { it.copy(sentenceParts = buildSentenceUseCase.getCurrentParts(), selectedWordIndex = null, predictedButtons = emptyList()) }
         } else {
             var updatedParts = _uiState.value.sentenceParts
-            for (word in words) {
-                updatedParts = buildSentenceUseCase.addPart(word)
-            }
+            for (word in words) updatedParts = buildSentenceUseCase.addPart(word)
             _uiState.update { it.copy(sentenceParts = updatedParts, selectedWordIndex = null, predictedButtons = emptyList()) }
+        }
+    }
+
+    /**
+     * Load a phrase from speech history into the sentence bar.
+     * Clears the current sentence and loads each word as a separate part.
+     */
+    fun loadPhraseFromHistory(phrase: String) {
+        buildSentenceUseCase.clear()
+        val words = phrase.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }
+        var updatedParts = emptyList<String>()
+        for (word in words) {
+            updatedParts = buildSentenceUseCase.addPart(word)
+        }
+        _uiState.update {
+            it.copy(
+                sentenceParts = updatedParts,
+                selectedWordIndex = null,
+                lastTappedButtonId = null,
+                predictedButtons = emptyList()
+            )
         }
     }
 
     fun applySuffix(suffixType: String) {
         val currentParts = _uiState.value.sentenceParts
         if (currentParts.isEmpty()) return
-
-        // Apply suffix to selected word, or last word if none selected
         val targetIndex = _uiState.value.selectedWordIndex ?: (currentParts.size - 1)
         if (targetIndex !in currentParts.indices) return
-
         val targetWord = currentParts[targetIndex]
         val modifiedWord = when (suffixType) {
             "s" -> EnglishSuffixEngine.addPlural(targetWord)
@@ -265,15 +224,9 @@ class GridViewModel @Inject constructor(
             "nt" -> EnglishSuffixEngine.addNegation(targetWord)
             else -> targetWord
         }
-
         if (modifiedWord != targetWord) {
             val updatedParts = buildSentenceUseCase.replacePartAt(targetIndex, modifiedWord)
-            _uiState.update {
-                it.copy(
-                    sentenceParts = updatedParts,
-                    selectedWordIndex = null // Auto-deselect after action
-                )
-            }
+            _uiState.update { it.copy(sentenceParts = updatedParts, selectedWordIndex = null) }
         }
     }
 
@@ -301,9 +254,7 @@ class GridViewModel @Inject constructor(
 
     fun removeLastPart() {
         val selectedIndex = _uiState.value.selectedWordIndex
-
         if (selectedIndex != null && selectedIndex in _uiState.value.sentenceParts.indices) {
-            // Remove the selected word specifically
             val updatedParts = buildSentenceUseCase.removePartAt(selectedIndex)
             _uiState.update { it.copy(sentenceParts = updatedParts, selectedWordIndex = null, predictedButtons = emptyList()) }
         } else {

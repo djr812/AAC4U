@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import net.djrogers.aac4u.ui.about.AboutScreen
 import net.djrogers.aac4u.ui.editor.CoreWordsEditorScreen
 import net.djrogers.aac4u.ui.grid.GridScreen
+import net.djrogers.aac4u.ui.grid.GridViewModel
 import net.djrogers.aac4u.ui.history.HistoryScreen
 import net.djrogers.aac4u.ui.profiles.ProfileScreen
 import net.djrogers.aac4u.ui.quickphrases.QuickPhrasesScreen
@@ -38,7 +39,9 @@ fun AAC4UNavHost(
 
     var isEditMode by remember { mutableStateOf(false) }
 
-    // Active profile state
+    // Phrase loaded from history — consumed by GridScreen on next composition
+    var pendingPhrase by remember { mutableStateOf<String?>(null) }
+
     val activeProfile by welcomeViewModel.activeProfile.collectAsStateWithLifecycle()
 
     LaunchedEffect(currentRoute) {
@@ -81,13 +84,24 @@ fun AAC4UNavHost(
             startDestination = Screen.Grid.route
         ) {
             composable(Screen.Grid.route) {
+                val gridViewModel: GridViewModel = hiltViewModel()
+
+                // Consume pending phrase from history
+                LaunchedEffect(pendingPhrase) {
+                    pendingPhrase?.let { phrase ->
+                        gridViewModel.loadPhraseFromHistory(phrase)
+                        pendingPhrase = null
+                    }
+                }
+
                 GridScreen(
                     windowSizeClass = windowSizeClass,
                     isEditMode = isEditMode,
                     onToggleEditMode = { isEditMode = !isEditMode },
                     onOpenDrawer = {
                         scope.launch { drawerState.open() }
-                    }
+                    },
+                    viewModel = gridViewModel
                 )
             }
 
@@ -111,7 +125,10 @@ fun AAC4UNavHost(
 
             composable(Screen.History.route) {
                 HistoryScreen(
-                    onNavigateBack = { navController.popBackStack() }
+                    onNavigateBack = { navController.popBackStack() },
+                    onLoadPhrase = { phrase ->
+                        pendingPhrase = phrase
+                    }
                 )
             }
 
