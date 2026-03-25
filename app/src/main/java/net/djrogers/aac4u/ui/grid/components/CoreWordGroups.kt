@@ -4,7 +4,9 @@ import androidx.compose.ui.graphics.Color
 
 data class CoreWordGroup(
     val name: String,
+    val label: String,
     val color: Color,
+    val symbolWord: String,
     val textColor: Color = Color(0xFF212121),
     val words: List<String>
 )
@@ -12,31 +14,41 @@ data class CoreWordGroup(
 object CoreWordGroups {
     val INTERJECTIONS = CoreWordGroup(
         name = "Social",
+        label = "Social",
         color = Color(0xFFFFCDD2),
+        symbolWord = "hello",
         words = listOf("yes", "no", "thank you", "please", "hello", "goodbye")
     )
 
     val PRONOUNS = CoreWordGroup(
         name = "Pronouns",
+        label = "Pronouns",
         color = Color(0xFFBBDEFB),
+        symbolWord = "I",
         words = listOf("I", "me", "my", "mine", "you", "it", "he", "she", "we", "they")
     )
 
     val QUESTION_WORDS = CoreWordGroup(
         name = "Questions",
+        label = "Questions",
         color = Color(0xFFE0E0E0),
+        symbolWord = "what",
         words = listOf("what", "when", "where", "who", "why", "how")
     )
 
     val PREVERBS = CoreWordGroup(
         name = "Helpers",
+        label = "Helpers",
         color = Color(0xFFE1BEE7),
+        symbolWord = "can",
         words = listOf("be", "is", "am", "are", "was", "were", "do", "did", "can", "have", "will")
     )
 
     val VERBS = CoreWordGroup(
         name = "Actions",
+        label = "Verbs",
         color = Color(0xFFC8E6C9),
+        symbolWord = "go",
         words = listOf(
             "go", "stop", "turn", "make", "look", "see", "find", "put",
             "open", "close", "eat", "drink", "get", "help", "want", "need",
@@ -47,7 +59,9 @@ object CoreWordGroups {
 
     val ADJECTIVES = CoreWordGroup(
         name = "Describing",
+        label = "Describing",
         color = Color(0xFFFFF9C4),
+        symbolWord = "happy",
         words = listOf(
             "more", "one", "big", "little", "fast", "slow", "same", "different",
             "pretty", "red", "blue", "yellow", "good", "bad", "new", "old", "happy", "sad"
@@ -56,25 +70,33 @@ object CoreWordGroups {
 
     val PREPOSITIONS = CoreWordGroup(
         name = "Where",
+        label = "Where",
         color = Color(0xFFB2EBF2),
+        symbolWord = "in",
         words = listOf("on", "off", "in", "out", "up", "down", "to", "for", "under", "with")
     )
 
     val DETERMINERS = CoreWordGroup(
         name = "Pointers",
+        label = "Pointers",
         color = Color(0xFFFFE0B2),
+        symbolWord = "this",
         words = listOf("this", "that", "some", "all", "the")
     )
 
     val CONJUNCTIONS = CoreWordGroup(
         name = "Joining",
+        label = "Joining",
         color = Color(0xFFDCEDC8),
+        symbolWord = "and",
         words = listOf("and", "but")
     )
 
     val ADVERBS = CoreWordGroup(
         name = "When/How",
+        label = "When",
         color = Color(0xFFFFCCBC),
+        symbolWord = "now",
         words = listOf("not", "now", "here", "there", "away", "again")
     )
 
@@ -84,9 +106,6 @@ object CoreWordGroups {
         DETERMINERS, ADVERBS, CONJUNCTIONS
     )
 
-    /**
-     * Map of hex colour string → group, for matching user-added words by their backgroundColor.
-     */
     private val hexToGroup: Map<String, CoreWordGroup> = mapOf(
         "#BBDEFB" to PRONOUNS,
         "#C8E6C9" to VERBS,
@@ -100,10 +119,6 @@ object CoreWordGroups {
         "#FFCCBC" to ADVERBS
     )
 
-    /**
-     * Get the group colour for a given core word.
-     * Checks word lists first, then falls back to default.
-     */
     fun colorForWord(word: String): Color {
         for (group in ALL_GROUPS) {
             if (word in group.words || word.lowercase() in group.words.map { it.lowercase() }) {
@@ -113,28 +128,15 @@ object CoreWordGroups {
         return Color(0xFFCFD8DC)
     }
 
-    /**
-     * Find which group a button belongs to.
-     * Checks by word label first, then by backgroundColor hex.
-     */
     fun groupForButton(label: String, backgroundColor: String?): CoreWordGroup? {
-        // First try matching by word
         for (group in ALL_GROUPS) {
-            if (label.lowercase() in group.words.map { it.lowercase() }) {
-                return group
-            }
+            if (label.lowercase() in group.words.map { it.lowercase() }) return group
         }
-        // Then try matching by background colour (user-added words)
         if (backgroundColor != null) {
             return hexToGroup[backgroundColor.uppercase()] ?: hexToGroup[backgroundColor]
         }
         return null
     }
 
-    /**
-     * Get all unique core words across all groups.
-     */
-    fun allWords(): List<String> {
-        return ALL_GROUPS.flatMap { it.words }.distinct()
-    }
+    fun allWords(): List<String> = ALL_GROUPS.flatMap { it.words }.distinct()
 }

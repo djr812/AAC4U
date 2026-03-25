@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -45,7 +46,6 @@ fun ExpandableCorePanel(
     var expandedGroupIndex by remember { mutableStateOf(-1) }
     val groups = CoreWordGroups.ALL_GROUPS
 
-    // Build a map of group index → buttons (including user-added words matched by backgroundColor)
     val groupedButtons = remember(coreButtons) {
         buildGroupedButtons(coreButtons, groups)
     }
@@ -58,24 +58,20 @@ fun ExpandableCorePanel(
             horizontalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             groups.forEachIndexed { index, group ->
-                val triggerWord = group.words.first()
-                val triggerButton = coreButtons.find {
-                    it.label.equals(triggerWord, ignoreCase = true)
-                }
                 val isGroupExpanded = expandedGroupIndex == index
+                val symbolButton = coreButtons.find {
+                    it.label.equals(group.symbolWord, ignoreCase = true)
+                }
 
-                CoreTriggerButton(
-                    word = triggerWord,
-                    button = triggerButton,
-                    groupColor = group.color,
+                CoreFolderButton(
+                    group = group,
+                    symbolButton = symbolButton,
                     isExpanded = isGroupExpanded,
                     isEditMode = isEditMode,
                     highContrast = highContrast,
                     largeText = largeText,
                     onTap = {
-                        if (isEditMode && triggerButton != null) {
-                            onButtonEdit(triggerButton)
-                        } else {
+                        if (!isEditMode) {
                             expandedGroupIndex = if (isGroupExpanded) -1 else index
                         }
                     },
@@ -92,7 +88,6 @@ fun ExpandableCorePanel(
                    else shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
         ) {
             if (expandedGroupIndex >= 0 && expandedGroupIndex < groups.size) {
-                val group = groups[expandedGroupIndex]
                 val buttonsForGroup = groupedButtons[expandedGroupIndex] ?: emptyList()
 
                 Surface(
@@ -123,9 +118,8 @@ fun ExpandableCorePanel(
                                 highContrast = highContrast,
                                 largeText = largeText,
                                 onTap = {
-                                    if (isEditMode) {
-                                        onButtonEdit(button)
-                                    } else {
+                                    if (isEditMode) onButtonEdit(button)
+                                    else {
                                         onButtonTapped(button)
                                         expandedGroupIndex = -1
                                     }
@@ -139,10 +133,6 @@ fun ExpandableCorePanel(
     }
 }
 
-/**
- * Build a map of group index → list of (button, colour) pairs.
- * Includes both predefined words and user-added words matched by backgroundColor.
- */
 private fun buildGroupedButtons(
     coreButtons: List<AACButton>,
     groups: List<CoreWordGroup>
@@ -150,10 +140,8 @@ private fun buildGroupedButtons(
     val result = mutableMapOf<Int, MutableList<Pair<AACButton, Color>>>()
     val assignedIds = mutableSetOf<Long>()
 
-    // First pass: match predefined words by label
     groups.forEachIndexed { index, group ->
         val buttonsForGroup = mutableListOf<Pair<AACButton, Color>>()
-
         for (word in group.words) {
             val button = coreButtons.find { it.label.equals(word, ignoreCase = true) }
             if (button != null) {
@@ -161,14 +149,11 @@ private fun buildGroupedButtons(
                 assignedIds.add(button.id)
             }
         }
-
         result[index] = buttonsForGroup
     }
 
-    // Second pass: match unassigned buttons by backgroundColor
     for (button in coreButtons) {
         if (button.id in assignedIds) continue
-
         val matchedGroup = CoreWordGroups.groupForButton(button.label, button.backgroundColor)
         if (matchedGroup != null) {
             val groupIndex = groups.indexOf(matchedGroup)
@@ -183,10 +168,9 @@ private fun buildGroupedButtons(
 }
 
 @Composable
-private fun CoreTriggerButton(
-    word: String,
-    button: AACButton?,
-    groupColor: Color,
+private fun CoreFolderButton(
+    group: CoreWordGroup,
+    symbolButton: AACButton?,
     isExpanded: Boolean,
     isEditMode: Boolean,
     highContrast: Boolean,
@@ -196,73 +180,105 @@ private fun CoreTriggerButton(
 ) {
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
-    val hasImage = button?.imagePath != null
+    val hasImage = symbolButton?.imagePath != null
 
     val effectiveColor = if (highContrast) {
-        groupColor.copy(
-            red = (groupColor.red * 0.6f).coerceIn(0f, 1f),
-            green = (groupColor.green * 0.6f).coerceIn(0f, 1f),
-            blue = (groupColor.blue * 0.6f).coerceIn(0f, 1f)
+        group.color.copy(
+            red = (group.color.red * 0.6f).coerceIn(0f, 1f),
+            green = (group.color.green * 0.6f).coerceIn(0f, 1f),
+            blue = (group.color.blue * 0.6f).coerceIn(0f, 1f)
         )
     } else {
-        if (isExpanded) groupColor else groupColor.copy(alpha = 0.7f)
+        if (isExpanded) group.color else group.color.copy(alpha = 0.75f)
     }
 
     val textColor = if (highContrast) Color.White else Color(0xFF212121)
+    val folderShape = remember { FolderShape(tabWidthFraction = 0.4f, tabHeightFraction = 0.14f, cornerRadius = 12f) }
 
-    Surface(
+    Box(
         modifier = modifier
-            .aspectRatio(1f)
-            .clip(RoundedCornerShape(6.dp))
+            .aspectRatio(0.8f)
+            .shadow(
+                elevation = if (isExpanded) 4.dp else 1.dp,
+                shape = folderShape,
+                ambientColor = Color(0x40000000),
+                spotColor = Color(0x30000000)
+            )
+            .clip(folderShape)
             .clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 view.playSoundEffect(SoundEffectConstants.CLICK)
                 onTap()
-            },
-        color = effectiveColor,
-        shape = RoundedCornerShape(6.dp),
-        shadowElevation = if (isExpanded) 3.dp else 1.dp,
-        border = if (highContrast) BorderStroke(2.dp, Color.White) else null
+            }
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier.fillMaxSize().padding(3.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                if (hasImage) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(button?.imagePath).crossfade(false).build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp)
-                    )
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = effectiveColor,
+            shape = folderShape
+        ) {}
+
+        // Content — extra top padding to clear the tab area, generous side padding
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 12.dp, start = 5.dp, end = 5.dp, bottom = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            // Symbol image — constrained to avoid clipping
+            if (hasImage) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(symbolButton?.imagePath)
+                        .crossfade(false)
+                        .build(),
+                    contentDescription = group.label,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(0.8f)
+                        .padding(vertical = 2.dp)
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = word,
-                        fontSize = if (largeText) 12.sp else 9.sp,
-                        fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.SemiBold,
-                        color = textColor, textAlign = TextAlign.Center,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                } else {
-                    Text(
-                        text = word,
-                        fontSize = if (largeText) 15.sp else 12.sp,
-                        fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.Bold,
-                        color = textColor, textAlign = TextAlign.Center,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis
+                        text = group.symbolWord,
+                        fontSize = if (largeText) 14.sp else 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = textColor.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center
                     )
                 }
             }
+
+            // Category label
             Text(
-                text = if (isExpanded) "▲" else "▼", fontSize = 8.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (highContrast) Color.White.copy(alpha = 0.8f) else Color(0xFF546E7A),
-                modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp)
+                text = group.label,
+                fontSize = if (largeText) 10.sp else 8.sp,
+                fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.Bold,
+                color = textColor,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
             )
         }
+
+        // Expand indicator
+        Text(
+            text = if (isExpanded) "▲" else "▼",
+            fontSize = 7.sp,
+            fontWeight = FontWeight.Bold,
+            color = if (highContrast) Color.White.copy(alpha = 0.8f) else Color(0xFF546E7A),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(3.dp)
+        )
     }
 }
 
@@ -291,14 +307,17 @@ private fun CoreWordGridButton(
     val textColor = if (highContrast) Color.White else Color(0xFF212121)
 
     Surface(
-        modifier = modifier.fillMaxWidth().aspectRatio(1f)
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
             .clip(RoundedCornerShape(6.dp))
             .clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 view.playSoundEffect(SoundEffectConstants.CLICK)
                 onTap()
             },
-        color = effectiveColor, shape = RoundedCornerShape(6.dp),
+        color = effectiveColor,
+        shape = RoundedCornerShape(6.dp),
         shadowElevation = 1.dp,
         border = if (highContrast) BorderStroke(2.dp, Color.White) else null
     ) {
