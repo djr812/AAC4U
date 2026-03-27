@@ -1,7 +1,9 @@
 package net.djrogers.aac4u.ui.grid.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -16,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import net.djrogers.aac4u.domain.model.Category
 import net.djrogers.aac4u.ui.theme.AACColors
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CategoryTabs(
     categories: List<Category>,
@@ -45,7 +48,7 @@ fun CategoryTabs(
 
             Tab(
                 selected = isSelected,
-                onClick = { onCategorySelected(category) },
+                onClick = {},
                 modifier = Modifier.padding(horizontal = 2.dp)
             ) {
                 Row(
@@ -54,6 +57,20 @@ fun CategoryTabs(
                         .clip(RoundedCornerShape(8.dp))
                         .background(
                             if (isSelected) categoryColor else categoryColor.copy(alpha = 0.3f)
+                        )
+                        .combinedClickable(
+                            onClick = {
+                                if (isEditMode) {
+                                    onCategoryEdit(category)
+                                } else {
+                                    onCategorySelected(category)
+                                }
+                            },
+                            onLongClick = {
+                                if (!isEditMode) {
+                                    onCategoryEdit(category)
+                                }
+                            }
                         )
                         .padding(horizontal = 8.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically

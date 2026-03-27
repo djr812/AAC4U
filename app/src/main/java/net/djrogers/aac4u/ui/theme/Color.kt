@@ -33,55 +33,80 @@ val Black = Color(0xFF000000)
 val White = Color(0xFFFFFFFF)
 val Yellow = Color(0xFFFFFF00)
 
-// ── Soft Pastel Category Colours ──
-// Gentle, child-friendly pastels for button backgrounds.
-// Each category gets its own colour so users build visual association
-// between colour and meaning (e.g. "pink = feelings").
 object AACColors {
-    val Feelings    = Color(0xFFFFCDD2) // Soft pink
-    val Actions     = Color(0xFFC8E6C9) // Soft green
-    val FoodDrink   = Color(0xFFFFE0B2) // Soft peach/orange
-    val People      = Color(0xFFF8BBD0) // Soft rose
-    val Places      = Color(0xFFE1BEE7) // Soft lavender
-    val Things      = Color(0xFFFFF9C4) // Soft yellow
-    val Descriptions = Color(0xFFB2EBF2) // Soft cyan
-    val Time        = Color(0xFFDCEDC8) // Soft lime
-    val Questions   = Color(0xFFD7CCC8) // Soft warm grey
-    val Social      = Color(0xFFBBDEFB) // Soft sky blue
-    val QuickPhrases = Color(0xFFFFCCBC) // Soft coral
+    val Feelings    = Color(0xFFFFCDD2)
+    val Actions     = Color(0xFFC8E6C9)
+    val FoodDrink   = Color(0xFFFFE0B2)
+    val People      = Color(0xFFF8BBD0)
+    val Places      = Color(0xFFE1BEE7)
+    val Things      = Color(0xFFFFF9C4)
+    val Descriptions = Color(0xFFB2EBF2)
+    val Time        = Color(0xFFDCEDC8)
+    val Questions   = Color(0xFFD7CCC8)
+    val Social      = Color(0xFFBBDEFB)
+    val QuickPhrases = Color(0xFFFFCCBC)
+    val Core        = Color(0xFFCFD8DC)
+    val PressedOverlay = Color(0x22000000)
 
-    // Core vocabulary gets a distinctive look — slightly blue-grey
-    // to set it apart from the colourful fringe categories
-    val Core        = Color(0xFFCFD8DC) // Blue-grey pastel
+    // Built-in category name → hex mapping
+    private val builtInCategoryHex = mapOf(
+        "feelings" to "#FFCDD2",
+        "actions" to "#C8E6C9",
+        "food & drink" to "#FFE0B2",
+        "people" to "#F8BBD0",
+        "places" to "#E1BEE7",
+        "things" to "#FFF9C4",
+        "descriptions" to "#B2EBF2",
+        "time" to "#DCEDC8",
+        "questions" to "#D7CCC8",
+        "social" to "#BBDEFB",
+        "quick phrases" to "#FFCCBC",
+        "core" to "#CFD8DC"
+    )
 
-    // Pressed/selected state — slightly darker overlay
-    val PressedOverlay = Color(0x22000000) // 13% black overlay
+    // Dynamically registered colours for user-created categories
+    private val customCategoryColors = mutableMapOf<String, String>()
 
     /**
-     * Look up category colour by name.
-     * Falls back to a neutral grey if no match found.
+     * Register a colour for a user-created category.
      */
-    fun forCategory(categoryName: String): Color {
-        return when (categoryName.lowercase()) {
-            "feelings" -> Feelings
-            "actions" -> Actions
-            "food & drink" -> FoodDrink
-            "people" -> People
-            "places" -> Places
-            "things" -> Things
-            "descriptions" -> Descriptions
-            "time" -> Time
-            "questions" -> Questions
-            "social" -> Social
-            "quick phrases" -> QuickPhrases
-            "core" -> Core
-            else -> Grey100
-        }
+    fun registerCategoryColor(categoryName: String, hex: String) {
+        customCategoryColors[categoryName.lowercase()] = hex
     }
 
     /**
-     * Get a slightly darker version of a colour for pressed states.
+     * Look up category colour by name.
+     * Checks built-in categories first, then user-registered ones.
      */
+    fun forCategory(categoryName: String): Color {
+        val key = categoryName.lowercase()
+
+        // Check built-in
+        val builtIn = builtInCategoryHex[key]
+        if (builtIn != null) {
+            return try { Color(android.graphics.Color.parseColor(builtIn)) } catch (_: Exception) { Grey100 }
+        }
+
+        // Check user-registered
+        val custom = customCategoryColors[key]
+        if (custom != null) {
+            return try { Color(android.graphics.Color.parseColor(custom)) } catch (_: Exception) { Grey100 }
+        }
+
+        return Grey100
+    }
+
+    /**
+     * Get the hex string for a category's colour.
+     * Used for checking which colours are already in use.
+     */
+    fun forCategoryHex(categoryName: String): String {
+        val key = categoryName.lowercase()
+        return builtInCategoryHex[key]
+            ?: customCategoryColors[key]
+            ?: "#F5F5F5"
+    }
+
     fun pressed(color: Color): Color {
         return color.copy(
             red = (color.red * 0.85f).coerceIn(0f, 1f),
@@ -90,11 +115,7 @@ object AACColors {
         )
     }
 
-    /**
-     * Get appropriate text colour for a given background.
-     * All our pastels are light, so we always use dark text.
-     */
     fun textOn(backgroundColor: Color): Color {
-        return Color(0xFF37474F) // Dark blue-grey — readable on all pastels
+        return Color(0xFF37474F)
     }
 }

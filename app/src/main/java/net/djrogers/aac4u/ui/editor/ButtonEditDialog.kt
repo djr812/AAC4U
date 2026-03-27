@@ -20,21 +20,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
-private val colorSwatches = listOf(
-    null to "Default",
-    "#FFCDD2" to "Pink",
-    "#F8BBD0" to "Rose",
-    "#E1BEE7" to "Lavender",
-    "#BBDEFB" to "Sky Blue",
-    "#B2EBF2" to "Cyan",
-    "#C8E6C9" to "Green",
-    "#DCEDC8" to "Lime",
-    "#FFF9C4" to "Yellow",
-    "#FFE0B2" to "Peach",
-    "#FFCCBC" to "Coral",
-    "#D7CCC8" to "Warm Grey"
-)
-
 private val wordTypeDescriptions = mapOf(
     "Pronoun" to "I, me, you, he, she, we, they",
     "Verb" to "go, want, eat, play, help",
@@ -156,8 +141,8 @@ fun ButtonEditDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Only show word type picker for core words
                     if (state.isCoreWord) {
-                        // ── Word Type Picker ──
                         Text(
                             text = "Word Type",
                             fontSize = 14.sp,
@@ -204,83 +189,24 @@ fun ButtonEditDialog(
                                         contentAlignment = Alignment.Center
                                     ) {
                                         if (isSelected) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(8.dp)
-                                                    .clip(CircleShape)
-                                                    .background(Color.White)
-                                            )
+                                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color.White))
                                         }
                                     }
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
-                                            text = type,
-                                            fontSize = 15.sp,
+                                            text = type, fontSize = 15.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                                             color = Color(0xFF212121)
                                         )
-                                        Text(
-                                            text = description,
-                                            fontSize = 11.sp,
-                                            color = Color(0xFF757575)
-                                        )
+                                        Text(text = description, fontSize = 11.sp, color = Color(0xFF757575))
                                     }
-                                }
-                            }
-                        }
-                    } else {
-                        // ── Colour Picker ──
-                        Text(
-                            text = "Button Colour",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF616161)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        val rows = colorSwatches.chunked(4)
-                        rows.forEach { row ->
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                row.forEach { (hex, label) ->
-                                    val isSelected = state.editedColor == hex
-                                    val swatchColor = if (hex != null) {
-                                        Color(android.graphics.Color.parseColor(hex))
-                                    } else {
-                                        Color(0xFFE0E0E0)
-                                    }
-
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .padding(vertical = 4.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .background(swatchColor)
-                                                .border(
-                                                    width = if (isSelected) 3.dp else 1.dp,
-                                                    color = if (isSelected) Color(0xFF42A5F5) else Color(0xFFBDBDBD),
-                                                    shape = CircleShape
-                                                )
-                                                .clickable { onColorChanged(hex) }
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(text = label, fontSize = 10.sp, color = Color(0xFF9E9E9E))
-                                    }
-                                }
-                                repeat(4 - row.size) {
-                                    Spacer(modifier = Modifier.weight(1f))
                                 }
                             }
                         }
                     }
+
+                    // No colour picker for fringe words — they inherit from their category
 
                     // Hide/Show and Delete — existing buttons only
                     if (!state.isNewButton) {
@@ -328,9 +254,7 @@ fun ButtonEditDialog(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f).height(44.dp),
                         shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Cancel", fontSize = 14.sp, color = Color(0xFF757575))
-                    }
+                    ) { Text("Cancel", fontSize = 14.sp, color = Color(0xFF757575)) }
 
                     val canSave = state.editedLabel.isNotBlank() &&
                             state.duplicateWarning == null &&

@@ -70,7 +70,8 @@ fun GridScreen(
         onShowDeleteConfirmation = categoryEditorViewModel::showDeleteConfirmation,
         onConfirmDelete = categoryEditorViewModel::deleteCategory,
         onCancelDelete = categoryEditorViewModel::hideDeleteConfirmation,
-        onDismiss = categoryEditorViewModel::dismissDialog
+        onDismiss = categoryEditorViewModel::dismissDialog,
+        onColorSelected = categoryEditorViewModel::selectColor
     )
 
     KeyboardInputDialog(
@@ -115,20 +116,15 @@ fun GridScreen(
                     }
                 } else {
                     SentenceBar(
-                        sentenceParts = uiState.sentenceParts,
-                        predictedWords = uiState.predictedButtons,
-                        isSpeaking = uiState.isSpeaking,
-                        highContrast = hc,
-                        largeText = lt,
+                        sentenceParts = uiState.sentenceParts, predictedWords = uiState.predictedButtons,
+                        isSpeaking = uiState.isSpeaking, highContrast = hc, largeText = lt,
                         selectedWordIndex = uiState.selectedWordIndex,
-                        onSpeak = viewModel::speakSentence,
-                        onBackspace = viewModel::removeLastPart,
-                        onClear = viewModel::clearSentence,
-                        onStop = viewModel::stopSpeaking,
+                        onSpeak = viewModel::speakSentence, onBackspace = viewModel::removeLastPart,
+                        onClear = viewModel::clearSentence, onStop = viewModel::stopSpeaking,
                         onPredictionTapped = { viewModel.onPredictionAccepted(it) },
                         onSuffixApplied = { viewModel.applySuffix(it) },
                         onKeyboardTapped = { showKeyboardDialog = true },
-                        onWordTapped = { index -> viewModel.toggleWordSelection(index) },
+                        onWordTapped = { viewModel.toggleWordSelection(it) },
                         modifier = Modifier.weight(1f)
                     )
                 }

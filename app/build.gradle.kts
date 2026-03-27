@@ -124,4 +124,8 @@ dependencies {
     androidTestImplementation(composeBom)
     androidTestImplementation(libs.compose.ui.test.junit4)
     androidTestImplementation(libs.room.testing)
+
+    // Usually debugOnly, but you can use implementation for a private analysis build
+    // debugImplementation ("com.squareup.leakcanary:leakcanary-android:2.14")
+
 }

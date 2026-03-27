@@ -54,6 +54,8 @@
             android:name="android.speech.tts.engine"
             android:value="true" />
 
+        <profileable android:shell="true" />
+        
     </application>
 
 </manifest>
