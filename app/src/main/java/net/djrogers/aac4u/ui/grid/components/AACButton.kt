@@ -46,6 +46,7 @@ fun AACButton(
     showLabel: Boolean = true,
     categoryColor: Color = AACColors.forCategory(""),
     isEditMode: Boolean = false,
+    isHighlighted: Boolean = false,
     highContrast: Boolean = false,
     largeText: Boolean = false,
     reducedAnimations: Boolean = false,
@@ -71,7 +72,6 @@ fun AACButton(
         } else { categoryColor }
     }
 
-    // High contrast: darken backgrounds, use white text
     val effectiveBgColor = if (highContrast) {
         resolvedBgColor.copy(
             red = (resolvedBgColor.red * 0.6f).coerceIn(0f, 1f),
@@ -84,17 +84,18 @@ fun AACButton(
     val displayColor = if (isPressed && !reducedAnimations) AACColors.pressed(effectiveBgColor) else effectiveBgColor
 
     val borderColor = when {
+        isHighlighted -> Color(0xFF43A047)
         isEditMode -> Color(0xFFFF8F00)
         highContrast -> Color.White
         else -> Color(0x15000000)
     }
     val borderWidth = when {
+        isHighlighted -> 4.dp
         isEditMode -> 2.dp
         highContrast -> 3.dp
         else -> 1.dp
     }
 
-    // Font sizes
     val labelFontSize = if (largeText) 16.sp else 12.sp
     val textOnlyFontSize = if (largeText) 20.sp else 16.sp
     val labelLineHeight = if (largeText) 18.sp else 14.sp
@@ -106,7 +107,7 @@ fun AACButton(
         modifier = modifier
             .scale(scale)
             .shadow(
-                elevation = if (isPressed && !reducedAnimations) 1.dp else 3.dp,
+                elevation = if (isHighlighted) 6.dp else if (isPressed && !reducedAnimations) 1.dp else 3.dp,
                 shape = MaterialTheme.shapes.medium,
                 ambientColor = Color(0x40000000),
                 spotColor = Color(0x30000000)

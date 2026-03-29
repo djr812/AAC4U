@@ -1,6 +1,5 @@
 package net.djrogers.aac4u.ui.grid.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -34,6 +33,7 @@ fun SentenceBar(
     onPredictionTapped: (AACButton) -> Unit = {},
     onSuffixApplied: (String) -> Unit = {},
     onKeyboardTapped: () -> Unit = {},
+    onSearchTapped: () -> Unit = {},
     onWordTapped: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -93,13 +93,8 @@ fun SentenceBar(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .then(
-                                    if (isSelected) {
-                                        Modifier.border(
-                                            width = 2.dp,
-                                            color = if (highContrast) Color.White else Color(0xFFE65100),
-                                            shape = RoundedCornerShape(6.dp)
-                                        )
-                                    } else Modifier
+                                    if (isSelected) Modifier.border(2.dp, if (highContrast) Color.White else Color(0xFFE65100), RoundedCornerShape(6.dp))
+                                    else Modifier
                                 )
                                 .clickable { onWordTapped(index) }
                         ) {
@@ -115,21 +110,16 @@ fun SentenceBar(
                         }
                     }
 
-                    // Predictions (only when no word is selected)
                     if (sentenceParts.isNotEmpty() && predictedWords.isNotEmpty() && selectedWordIndex == null) {
                         predictedWords.take(3).forEach { prediction ->
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
                                 color = if (highContrast) Color(0xFF424242) else Color(0xFFE0E0E0).copy(alpha = 0.6f),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .clickable { onPredictionTapped(prediction) }
+                                modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable { onPredictionTapped(prediction) }
                             ) {
                                 Text(
-                                    text = prediction.label,
-                                    fontSize = predictionFontSize,
-                                    fontWeight = FontWeight.Normal,
-                                    fontStyle = FontStyle.Italic,
+                                    text = prediction.label, fontSize = predictionFontSize,
+                                    fontWeight = FontWeight.Normal, fontStyle = FontStyle.Italic,
                                     color = if (highContrast) Color(0xFFBDBDBD) else Color(0xFF757575),
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
@@ -138,12 +128,7 @@ fun SentenceBar(
                     }
 
                     if (sentenceParts.isEmpty()) {
-                        Text(
-                            text = "Tap words to build a sentence...",
-                            fontSize = placeholderFontSize,
-                            color = placeholderColor,
-                            fontStyle = FontStyle.Italic
-                        )
+                        Text("Tap words to build a sentence...", fontSize = placeholderFontSize, color = placeholderColor, fontStyle = FontStyle.Italic)
                     }
                 }
 
@@ -151,6 +136,12 @@ fun SentenceBar(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Search button
+                    IconButton(onClick = onSearchTapped, modifier = Modifier.size(36.dp)) {
+                        Text("🔍", fontSize = 16.sp)
+                    }
+
+                    // Keyboard button
                     IconButton(onClick = onKeyboardTapped, modifier = Modifier.size(36.dp)) {
                         Text("⌨", fontSize = 18.sp)
                     }
@@ -165,26 +156,18 @@ fun SentenceBar(
                     }
 
                     Surface(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { if (isSpeaking) onStop() else onSpeak() },
+                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)).clickable { if (isSpeaking) onStop() else onSpeak() },
                         color = if (isSpeaking) Color(0xFFEF5350) else Color(0xFF43A047),
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = if (isSpeaking) "⏹" else "▶",
-                                fontSize = 16.sp,
-                                color = Color.White
-                            )
+                            Text(if (isSpeaking) "⏹" else "▶", fontSize = 16.sp, color = Color.White)
                         }
                     }
                 }
             }
         }
 
-        // Suffix bar
         if (sentenceParts.isNotEmpty()) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
@@ -192,9 +175,7 @@ fun SentenceBar(
                 color = suffixBarColor
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -211,25 +192,11 @@ fun SentenceBar(
 }
 
 @Composable
-private fun SuffixButton(
-    label: String,
-    color: Color,
-    fontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
-    onClick: () -> Unit
-) {
+private fun SuffixButton(label: String, color: Color, fontSize: androidx.compose.ui.unit.TextUnit = 12.sp, onClick: () -> Unit) {
     Surface(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick),
-        color = color,
-        shape = RoundedCornerShape(6.dp)
+        modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onClick),
+        color = color, shape = RoundedCornerShape(6.dp)
     ) {
-        Text(
-            text = label,
-            fontSize = fontSize,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-        )
+        Text(label, fontSize = fontSize, fontWeight = FontWeight.Bold, color = Color.White, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
     }
 }

@@ -20,6 +20,7 @@ fun AACButtonGrid(
     highContrast: Boolean = false,
     largeText: Boolean = false,
     reducedAnimations: Boolean = false,
+    highlightedButtonId: Long? = null,
     onButtonTapped: (AACButtonModel) -> Unit,
     onButtonLongPressed: (AACButtonModel) -> Unit,
     modifier: Modifier = Modifier
@@ -41,6 +42,7 @@ fun AACButtonGrid(
                 showLabel = showLabels,
                 categoryColor = categoryColor,
                 isEditMode = isEditMode,
+                isHighlighted = highlightedButtonId == button.id,
                 highContrast = highContrast,
                 largeText = largeText,
                 reducedAnimations = reducedAnimations,

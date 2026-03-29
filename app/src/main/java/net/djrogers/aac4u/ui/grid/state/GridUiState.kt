@@ -28,6 +28,10 @@ data class GridUiState(
     val isSpeaking: Boolean = false,
     val isTtsReady: Boolean = false,
 
+    // Word finder highlight
+    val highlightedButtonId: Long? = null,
+    val requestedCoreGroupIndex: Int? = null,
+
     // Scanning mode state (Phase 3)
     val scanningHighlightIndex: Int? = null,
     val isScanningActive: Boolean = false,

@@ -18,6 +18,8 @@ import net.djrogers.aac4u.domain.usecase.grid.EnglishSuffixEngine
 import net.djrogers.aac4u.domain.usecase.grid.SelectButtonUseCase
 import net.djrogers.aac4u.domain.usecase.prediction.GetPredictedButtonsUseCase
 import net.djrogers.aac4u.domain.usecase.tts.SpeakPhraseUseCase
+import net.djrogers.aac4u.ui.grid.components.CoreWordGroups
+import net.djrogers.aac4u.ui.grid.components.WordFinderResult
 import net.djrogers.aac4u.ui.grid.state.GridUiState
 import javax.inject.Inject
 
@@ -36,11 +38,23 @@ class GridViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(GridUiState())
     val uiState: StateFlow<GridUiState> = _uiState.asStateFlow()
 
+    private val _wordFinderResults = MutableStateFlow<List<WordFinderResult>>(emptyList())
+    val wordFinderResults: StateFlow<List<WordFinderResult>> = _wordFinderResults.asStateFlow()
+
+    private val _wordFinderQuery = MutableStateFlow("")
+    val wordFinderQuery: StateFlow<String> = _wordFinderQuery.asStateFlow()
+
+    private val _isSearching = MutableStateFlow(false)
+    val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
+
     private var buttonsJob: Job? = null
     private var coreButtonsJob: Job? = null
     private var categoriesJob: Job? = null
     private var predictionsJob: Job? = null
+    private var searchJob: Job? = null
     private var activeProfileId: Long? = null
+
+    private var allCategories: List<Category> = emptyList()
 
     init {
         observeActiveProfile()
@@ -82,8 +96,9 @@ class GridViewModel @Inject constructor(
     private fun loadCategories(profileId: Long) {
         categoriesJob?.cancel()
         categoriesJob = viewModelScope.launch {
-            categoryRepository.getCategoriesByProfile(profileId).collect { allCategories ->
-                val fringeCategories = allCategories.filter { it.vocabularyType == VocabularyType.FRINGE }
+            categoryRepository.getCategoriesByProfile(profileId).collect { categories ->
+                allCategories = categories
+                val fringeCategories = categories.filter { it.vocabularyType == VocabularyType.FRINGE }
                 _uiState.update { it.copy(categories = fringeCategories, isLoading = false) }
                 val currentCategory = _uiState.value.currentCategory
                 val shouldReselect = currentCategory == null || fringeCategories.none { it.id == currentCategory.id }
@@ -116,7 +131,7 @@ class GridViewModel @Inject constructor(
     }
 
     fun selectCategory(category: Category) {
-        _uiState.update { it.copy(currentCategory = category, buttons = emptyList()) }
+        _uiState.update { it.copy(currentCategory = category, buttons = emptyList(), highlightedButtonId = null) }
         buttonsJob?.cancel()
         buttonsJob = viewModelScope.launch {
             buttonRepository.getButtonsByCategory(category.id).collect { buttons ->
@@ -124,6 +139,99 @@ class GridViewModel @Inject constructor(
             }
         }
     }
+
+    // ═══════════════════════════════════════
+    // WORD FINDER
+    // ═══════════════════════════════════════
+
+    fun updateWordFinderQuery(query: String) {
+        _wordFinderQuery.value = query
+
+        if (query.isBlank()) {
+            _wordFinderResults.value = emptyList()
+            _isSearching.value = false
+            return
+        }
+
+        val profileId = activeProfileId ?: return
+        _isSearching.value = true
+
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            buttonRepository.searchButtons(profileId, query).collect { buttons ->
+                val results = buttons.mapNotNull { button ->
+                    val category = allCategories.find { it.id == button.categoryId }
+                    if (category != null) {
+                        val isCoreWord = category.vocabularyType == VocabularyType.CORE
+
+                        // For core words, find the group name
+                        val displayCategoryName = if (isCoreWord) {
+                            val group = CoreWordGroups.groupForButton(button.label, button.backgroundColor)
+                            group?.name ?: "Core"
+                        } else {
+                            category.name
+                        }
+
+                        WordFinderResult(
+                            button = button,
+                            categoryName = displayCategoryName,
+                            categoryId = category.id,
+                            isCoreWord = isCoreWord
+                        )
+                    } else null
+                }
+                _wordFinderResults.value = results
+                _isSearching.value = false
+            }
+        }
+    }
+
+    fun clearWordFinder() {
+        _wordFinderQuery.value = ""
+        _wordFinderResults.value = emptyList()
+        _isSearching.value = false
+        searchJob?.cancel()
+    }
+
+    fun navigateToWord(result: WordFinderResult) {
+        if (result.isCoreWord) {
+            // Find which group index this core word belongs to
+            val group = CoreWordGroups.groupForButton(result.button.label, result.button.backgroundColor)
+            if (group != null) {
+                val groupIndex = CoreWordGroups.ALL_GROUPS.indexOf(group)
+                if (groupIndex >= 0) {
+                    _uiState.update {
+                        it.copy(
+                            requestedCoreGroupIndex = groupIndex,
+                            highlightedButtonId = result.button.id
+                        )
+                    }
+                }
+            }
+        } else {
+            // Fringe word — switch to category and highlight
+            val category = allCategories.find { it.id == result.categoryId } ?: return
+            _uiState.update { it.copy(highlightedButtonId = result.button.id) }
+            selectCategory(category)
+        }
+
+        // Clear highlight after 3 seconds
+        viewModelScope.launch {
+            kotlinx.coroutines.delay(3000)
+            _uiState.update { it.copy(highlightedButtonId = null) }
+        }
+    }
+
+    /**
+     * Called by GridScreen after consuming the requestedCoreGroupIndex.
+     */
+    fun clearCoreGroupRequest() {
+        _uiState.update { it.copy(requestedCoreGroupIndex = null) }
+    }
+
+    // ═══════════════════════════════════════
+    // SENTENCE WORD SELECTION
+    // ═══════════════════════════════════════
 
     fun toggleWordSelection(index: Int) {
         val currentSelection = _uiState.value.selectedWordIndex
@@ -135,6 +243,7 @@ class GridViewModel @Inject constructor(
     }
 
     fun onButtonTapped(button: AACButton) {
+        _uiState.update { it.copy(highlightedButtonId = null) }
         val selectedIndex = _uiState.value.selectedWordIndex
         if (selectedIndex != null && selectedIndex in _uiState.value.sentenceParts.indices) {
             val updatedParts = buildSentenceUseCase.replacePartAt(selectedIndex, button.phrase)
@@ -188,25 +297,12 @@ class GridViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Load a phrase from speech history into the sentence bar.
-     * Clears the current sentence and loads each word as a separate part.
-     */
     fun loadPhraseFromHistory(phrase: String) {
         buildSentenceUseCase.clear()
         val words = phrase.trim().split("\\s+".toRegex()).filter { it.isNotBlank() }
         var updatedParts = emptyList<String>()
-        for (word in words) {
-            updatedParts = buildSentenceUseCase.addPart(word)
-        }
-        _uiState.update {
-            it.copy(
-                sentenceParts = updatedParts,
-                selectedWordIndex = null,
-                lastTappedButtonId = null,
-                predictedButtons = emptyList()
-            )
-        }
+        for (word in words) updatedParts = buildSentenceUseCase.addPart(word)
+        _uiState.update { it.copy(sentenceParts = updatedParts, selectedWordIndex = null, lastTappedButtonId = null, predictedButtons = emptyList()) }
     }
 
     fun applySuffix(suffixType: String) {

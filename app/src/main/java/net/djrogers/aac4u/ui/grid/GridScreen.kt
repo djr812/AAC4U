@@ -25,6 +25,7 @@ import net.djrogers.aac4u.ui.grid.components.CategoryTabs
 import net.djrogers.aac4u.ui.grid.components.ExpandableCorePanel
 import net.djrogers.aac4u.ui.grid.components.KeyboardInputDialog
 import net.djrogers.aac4u.ui.grid.components.SentenceBar
+import net.djrogers.aac4u.ui.grid.components.WordFinderDialog
 import net.djrogers.aac4u.ui.theme.AACColors
 
 @Composable
@@ -41,8 +42,13 @@ fun GridScreen(
     val editState by editorViewModel.editState.collectAsStateWithLifecycle()
     val categoryDialogState by categoryEditorViewModel.dialogState.collectAsStateWithLifecycle()
 
+    val wordFinderResults by viewModel.wordFinderResults.collectAsStateWithLifecycle()
+    val wordFinderQuery by viewModel.wordFinderQuery.collectAsStateWithLifecycle()
+    val isSearching by viewModel.isSearching.collectAsStateWithLifecycle()
+
     var isCoreExpanded by remember { mutableStateOf(false) }
     var showKeyboardDialog by remember { mutableStateOf(false) }
+    var showWordFinder by remember { mutableStateOf(false) }
 
     val hc = uiState.highContrastEnabled
     val lt = uiState.largeTextEnabled
@@ -79,6 +85,23 @@ fun GridScreen(
         onAddWord = { viewModel.addTypedWord(it) },
         onAddSentence = { viewModel.addTypedSentence(it) },
         onDismiss = { showKeyboardDialog = false }
+    )
+
+    WordFinderDialog(
+        isVisible = showWordFinder,
+        results = wordFinderResults,
+        searchQuery = wordFinderQuery,
+        isSearching = isSearching,
+        onQueryChanged = viewModel::updateWordFinderQuery,
+        onResultTapped = { result ->
+            showWordFinder = false
+            viewModel.clearWordFinder()
+            viewModel.navigateToWord(result)
+        },
+        onDismiss = {
+            showWordFinder = false
+            viewModel.clearWordFinder()
+        }
     )
 
     Scaffold(
@@ -124,6 +147,7 @@ fun GridScreen(
                         onPredictionTapped = { viewModel.onPredictionAccepted(it) },
                         onSuffixApplied = { viewModel.applySuffix(it) },
                         onKeyboardTapped = { showKeyboardDialog = true },
+                        onSearchTapped = { showWordFinder = true },
                         onWordTapped = { viewModel.toggleWordSelection(it) },
                         modifier = Modifier.weight(1f)
                     )
@@ -149,6 +173,9 @@ fun GridScreen(
                     ExpandableCorePanel(
                         coreButtons = uiState.coreButtons, isEditMode = isEditMode, isExpanded = isCoreExpanded,
                         highContrast = hc, largeText = lt, reducedAnimations = ra,
+                        highlightedButtonId = uiState.highlightedButtonId,
+                        requestedGroupIndex = uiState.requestedCoreGroupIndex,
+                        onRequestedGroupConsumed = { viewModel.clearCoreGroupRequest() },
                         onToggleExpand = { isCoreExpanded = !isCoreExpanded },
                         onButtonTapped = { viewModel.onButtonTapped(it); isCoreExpanded = false },
                         onButtonEdit = { editorViewModel.editButton(it) },
@@ -174,6 +201,7 @@ fun GridScreen(
                     buttons = uiState.buttons, columns = uiState.gridColumns, showLabels = uiState.showLabels,
                     isEditMode = isEditMode, categoryColor = currentCategoryColor,
                     highContrast = hc, largeText = lt, reducedAnimations = ra,
+                    highlightedButtonId = uiState.highlightedButtonId,
                     onButtonTapped = { if (isEditMode) editorViewModel.editButton(it) else viewModel.onButtonTapped(it) },
                     onButtonLongPressed = { if (!isEditMode) editorViewModel.editButton(it) },
                     modifier = Modifier.fillMaxWidth().weight(1f)

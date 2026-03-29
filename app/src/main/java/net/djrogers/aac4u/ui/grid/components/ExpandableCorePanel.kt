@@ -38,6 +38,9 @@ fun ExpandableCorePanel(
     highContrast: Boolean = false,
     largeText: Boolean = false,
     reducedAnimations: Boolean = false,
+    highlightedButtonId: Long? = null,
+    requestedGroupIndex: Int? = null,
+    onRequestedGroupConsumed: () -> Unit = {},
     onToggleExpand: () -> Unit,
     onButtonTapped: (AACButton) -> Unit,
     onButtonEdit: (AACButton) -> Unit,
@@ -45,6 +48,14 @@ fun ExpandableCorePanel(
 ) {
     var expandedGroupIndex by remember { mutableStateOf(-1) }
     val groups = CoreWordGroups.ALL_GROUPS
+
+    // Handle external request to expand a specific group (from word finder)
+    LaunchedEffect(requestedGroupIndex) {
+        if (requestedGroupIndex != null && requestedGroupIndex >= 0) {
+            expandedGroupIndex = requestedGroupIndex
+            onRequestedGroupConsumed()
+        }
+    }
 
     val groupedButtons = remember(coreButtons) {
         buildGroupedButtons(coreButtons, groups)
@@ -115,6 +126,7 @@ fun ExpandableCorePanel(
                                 button = button,
                                 groupColor = groupColor,
                                 isEditMode = isEditMode,
+                                isHighlighted = highlightedButtonId == button.id,
                                 highContrast = highContrast,
                                 largeText = largeText,
                                 onTap = {
@@ -198,12 +210,7 @@ private fun CoreFolderButton(
     Box(
         modifier = modifier
             .aspectRatio(0.8f)
-            .shadow(
-                elevation = if (isExpanded) 4.dp else 1.dp,
-                shape = folderShape,
-                ambientColor = Color(0x40000000),
-                spotColor = Color(0x30000000)
-            )
+            .shadow(elevation = if (isExpanded) 4.dp else 1.dp, shape = folderShape, ambientColor = Color(0x40000000), spotColor = Color(0x30000000))
             .clip(folderShape)
             .clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -211,73 +218,31 @@ private fun CoreFolderButton(
                 onTap()
             }
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = effectiveColor,
-            shape = folderShape
-        ) {}
+        Surface(modifier = Modifier.fillMaxSize(), color = effectiveColor, shape = folderShape) {}
 
-        // Content — extra top padding to clear the tab area, generous side padding
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 12.dp, start = 5.dp, end = 5.dp, bottom = 4.dp),
+            modifier = Modifier.fillMaxSize().padding(top = 12.dp, start = 5.dp, end = 5.dp, bottom = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Symbol image — constrained to avoid clipping
             if (hasImage) {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(symbolButton?.imagePath)
-                        .crossfade(false)
-                        .build(),
-                    contentDescription = group.label,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(0.8f)
-                        .padding(vertical = 2.dp)
+                    model = ImageRequest.Builder(LocalContext.current).data(symbolButton?.imagePath).crossfade(false).build(),
+                    contentDescription = group.label, contentScale = ContentScale.Fit,
+                    modifier = Modifier.weight(1f).fillMaxWidth(0.8f).padding(vertical = 2.dp)
                 )
             } else {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = group.symbolWord,
-                        fontSize = if (largeText) 14.sp else 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = textColor.copy(alpha = 0.6f),
-                        textAlign = TextAlign.Center
-                    )
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Text(group.symbolWord, fontSize = if (largeText) 14.sp else 11.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.6f), textAlign = TextAlign.Center)
                 }
             }
-
-            // Category label
-            Text(
-                text = group.label,
-                fontSize = if (largeText) 10.sp else 8.sp,
-                fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.Bold,
-                color = textColor,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Text(group.label, fontSize = if (largeText) 10.sp else 8.sp, fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.Bold, color = textColor, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
         }
 
-        // Expand indicator
         Text(
-            text = if (isExpanded) "▲" else "▼",
-            fontSize = 7.sp,
-            fontWeight = FontWeight.Bold,
+            text = if (isExpanded) "▲" else "▼", fontSize = 7.sp, fontWeight = FontWeight.Bold,
             color = if (highContrast) Color.White.copy(alpha = 0.8f) else Color(0xFF546E7A),
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(3.dp)
+            modifier = Modifier.align(Alignment.BottomEnd).padding(3.dp)
         )
     }
 }
@@ -287,6 +252,7 @@ private fun CoreWordGridButton(
     button: AACButton,
     groupColor: Color,
     isEditMode: Boolean,
+    isHighlighted: Boolean = false,
     highContrast: Boolean,
     largeText: Boolean,
     onTap: () -> Unit,
@@ -306,20 +272,23 @@ private fun CoreWordGridButton(
 
     val textColor = if (highContrast) Color.White else Color(0xFF212121)
 
+    val borderStroke = when {
+        isHighlighted -> BorderStroke(3.dp, Color(0xFF43A047))
+        highContrast -> BorderStroke(2.dp, Color.White)
+        else -> null
+    }
+
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(1f)
+        modifier = modifier.fillMaxWidth().aspectRatio(1f)
             .clip(RoundedCornerShape(6.dp))
             .clickable {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 view.playSoundEffect(SoundEffectConstants.CLICK)
                 onTap()
             },
-        color = effectiveColor,
-        shape = RoundedCornerShape(6.dp),
-        shadowElevation = 1.dp,
-        border = if (highContrast) BorderStroke(2.dp, Color.White) else null
+        color = effectiveColor, shape = RoundedCornerShape(6.dp),
+        shadowElevation = if (isHighlighted) 4.dp else 1.dp,
+        border = borderStroke
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(3.dp),
@@ -328,27 +297,13 @@ private fun CoreWordGridButton(
         ) {
             if (hasImage) {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current)
-                        .data(button.imagePath).crossfade(false).build(),
+                    model = ImageRequest.Builder(LocalContext.current).data(button.imagePath).crossfade(false).build(),
                     contentDescription = null, contentScale = ContentScale.Fit,
                     modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp)
                 )
-                Text(
-                    text = button.label,
-                    fontSize = if (largeText) 13.sp else 10.sp,
-                    fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.SemiBold,
-                    color = textColor, textAlign = TextAlign.Center,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Text(button.label, fontSize = if (largeText) 13.sp else 10.sp, fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.SemiBold, color = textColor, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
             } else {
-                Text(
-                    text = button.label,
-                    fontSize = if (largeText) 16.sp else 13.sp,
-                    fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.Bold,
-                    color = textColor, textAlign = TextAlign.Center,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis
-                )
+                Text(button.label, fontSize = if (largeText) 16.sp else 13.sp, fontWeight = if (highContrast) FontWeight.ExtraBold else FontWeight.Bold, color = textColor, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
