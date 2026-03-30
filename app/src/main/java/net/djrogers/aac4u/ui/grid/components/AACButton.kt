@@ -4,6 +4,7 @@ import android.view.SoundEffectConstants
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -34,7 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import coil.size.Size
 import net.djrogers.aac4u.domain.model.AACButton as AACButtonModel
@@ -66,7 +67,6 @@ fun AACButton(
         label = "buttonScale"
     )
 
-    // Stable colour calculations — only recompute when inputs change
     val resolvedBgColor = remember(button.backgroundColor, categoryColor) {
         if (button.backgroundColor != null) {
             try { Color(android.graphics.Color.parseColor(button.backgroundColor)) }
@@ -148,13 +148,19 @@ fun AACButton(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                AsyncImage(
+                // Use rememberAsyncImagePainter to prevent AsyncImage from overriding decode size
+                val painter = rememberAsyncImagePainter(
                     model = ImageRequest.Builder(LocalContext.current)
                         .data(button.imagePath)
                         .crossfade(false)
                         .memoryCacheKey(button.imagePath)
-                        .size(150, 150) // Downscale from 300x300 to 150x150 — saves 75% bitmap memory
-                        .build(),
+                        .size(Size(150, 150))
+                        .allowRgb565(true)
+                        .build()
+                )
+
+                Image(
+                    painter = painter,
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier

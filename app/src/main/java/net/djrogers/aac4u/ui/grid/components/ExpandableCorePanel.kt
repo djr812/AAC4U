@@ -26,8 +26,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
+import androidx.compose.foundation.Image
+import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
+import coil.size.Size
 import net.djrogers.aac4u.domain.model.AACButton
 
 @Composable
@@ -226,8 +228,16 @@ private fun CoreFolderButton(
             verticalArrangement = Arrangement.Center
         ) {
             if (hasImage) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(symbolButton?.imagePath).crossfade(false).size(150, 150).build(),
+                val painter = rememberAsyncImagePainter(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(symbolButton?.imagePath)
+                        .crossfade(false)
+                        .size(Size(150, 150))
+                        .allowRgb565(true)
+                        .build()
+                )
+                Image(
+                    painter = painter,
                     contentDescription = group.label, contentScale = ContentScale.Fit,
                     modifier = Modifier.weight(1f).fillMaxWidth(0.8f).padding(vertical = 2.dp)
                 )
@@ -296,8 +306,16 @@ private fun CoreWordGridButton(
             verticalArrangement = Arrangement.Center
         ) {
             if (hasImage) {
-                AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(button.imagePath).crossfade(false).size(150, 150).build(),
+                val painter = rememberAsyncImagePainter(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(button.imagePath)
+                        .crossfade(false)
+                        .size(Size(150, 150))
+                        .allowRgb565(true)
+                        .build()
+                )
+                Image(
+                    painter = painter,
                     contentDescription = null, contentScale = ContentScale.Fit,
                     modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp)
                 )
