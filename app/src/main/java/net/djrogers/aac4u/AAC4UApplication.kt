@@ -1,6 +1,9 @@
 package net.djrogers.aac4u
 
 import android.app.Application
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
+import coil.ImageLoader
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +35,9 @@ class AAC4UApplication : Application() {
     @Inject
     lateinit var symbolManager: SymbolManager
 
+    @Inject
+    lateinit var imageLoader: ImageLoader
+
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onCreate() {
@@ -59,14 +65,39 @@ class AAC4UApplication : Application() {
                 // TTS not available
             }
         }
+
+        // Register memory pressure listener
+        registerComponentCallbacks(memoryCallbacks)
     }
 
     /**
-     * Scans all buttons in the database. For any button that has no imagePath,
-     * checks if a symbol is now available (either bundled or in the mapping)
-     * and updates the button if found. This handles the case where new symbols
-     * are added to the assets after the database was already seeded.
+     * Respond to system memory pressure by trimming image caches.
+     * Critical for 3GB devices where memory is tight.
      */
+    private val memoryCallbacks = object : ComponentCallbacks2 {
+        override fun onTrimMemory(level: Int) {
+            when {
+                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL -> {
+                    // System is critically low — clear all caches
+                    imageLoader.memoryCache?.clear()
+                }
+                level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW -> {
+                    // System is low — trim to half
+                    imageLoader.memoryCache?.trimMemory(level)
+                }
+                level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN -> {
+                    // App went to background — trim aggressively
+                    imageLoader.memoryCache?.clear()
+                }
+            }
+        }
+
+        override fun onConfigurationChanged(newConfig: Configuration) {}
+        override fun onLowMemory() {
+            imageLoader.memoryCache?.clear()
+        }
+    }
+
     private suspend fun refreshMissingSymbols() {
         try {
             val buttonDao = database.buttonDao()

@@ -227,7 +227,7 @@ private fun CoreFolderButton(
         ) {
             if (hasImage) {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(symbolButton?.imagePath).crossfade(false).build(),
+                    model = ImageRequest.Builder(LocalContext.current).data(symbolButton?.imagePath).crossfade(false).size(150, 150).build(),
                     contentDescription = group.label, contentScale = ContentScale.Fit,
                     modifier = Modifier.weight(1f).fillMaxWidth(0.8f).padding(vertical = 2.dp)
                 )
@@ -297,7 +297,7 @@ private fun CoreWordGridButton(
         ) {
             if (hasImage) {
                 AsyncImage(
-                    model = ImageRequest.Builder(LocalContext.current).data(button.imagePath).crossfade(false).build(),
+                    model = ImageRequest.Builder(LocalContext.current).data(button.imagePath).crossfade(false).size(150, 150).build(),
                     contentDescription = null, contentScale = ContentScale.Fit,
                     modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 2.dp, vertical = 1.dp)
                 )

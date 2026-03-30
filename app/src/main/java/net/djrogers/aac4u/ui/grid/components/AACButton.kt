@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import coil.size.Size
 import net.djrogers.aac4u.domain.model.AACButton as AACButtonModel
 import net.djrogers.aac4u.ui.theme.AACColors
 
@@ -65,6 +66,7 @@ fun AACButton(
         label = "buttonScale"
     )
 
+    // Stable colour calculations — only recompute when inputs change
     val resolvedBgColor = remember(button.backgroundColor, categoryColor) {
         if (button.backgroundColor != null) {
             try { Color(android.graphics.Color.parseColor(button.backgroundColor)) }
@@ -72,15 +74,20 @@ fun AACButton(
         } else { categoryColor }
     }
 
-    val effectiveBgColor = if (highContrast) {
-        resolvedBgColor.copy(
-            red = (resolvedBgColor.red * 0.6f).coerceIn(0f, 1f),
-            green = (resolvedBgColor.green * 0.6f).coerceIn(0f, 1f),
-            blue = (resolvedBgColor.blue * 0.6f).coerceIn(0f, 1f)
-        )
-    } else resolvedBgColor
+    val effectiveBgColor = remember(resolvedBgColor, highContrast) {
+        if (highContrast) {
+            resolvedBgColor.copy(
+                red = (resolvedBgColor.red * 0.6f).coerceIn(0f, 1f),
+                green = (resolvedBgColor.green * 0.6f).coerceIn(0f, 1f),
+                blue = (resolvedBgColor.blue * 0.6f).coerceIn(0f, 1f)
+            )
+        } else resolvedBgColor
+    }
 
-    val textColor = if (highContrast) Color.White else remember(resolvedBgColor) { AACColors.textOn(resolvedBgColor) }
+    val textColor = remember(resolvedBgColor, highContrast) {
+        if (highContrast) Color.White else AACColors.textOn(resolvedBgColor)
+    }
+
     val displayColor = if (isPressed && !reducedAnimations) AACColors.pressed(effectiveBgColor) else effectiveBgColor
 
     val borderColor = when {
@@ -146,6 +153,7 @@ fun AACButton(
                         .data(button.imagePath)
                         .crossfade(false)
                         .memoryCacheKey(button.imagePath)
+                        .size(150, 150) // Downscale from 300x300 to 150x150 — saves 75% bitmap memory
                         .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Fit,
